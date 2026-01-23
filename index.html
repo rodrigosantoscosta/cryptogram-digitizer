@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Digitalizador de Criptogramas</title>
+    
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+        }
+
+        .status.ready {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+        }
+
+        .upload-section {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-section.dragover {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+
+        .upload-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .upload-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .result-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+
+        .result-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        canvas {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 10px 0;
+            border: 2px solid #e0e0e0;
+        }
+
+        .info-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        .info-box strong {
+            color: #333;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .log {
+            background: #1e1e1e;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+        }
+
+        .log-entry.info { color: #0ff; }
+        .log-entry.success { color: #0f0; }
+        .log-entry.error { color: #f00; }
+        .log-entry.warning { color: #ff0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔤 Digitalizador de Criptogramas</h1>
+        <p class="subtitle">Teste do Módulo de Processamento de Imagem</p>
+
+        <!-- Status do OpenCV -->
+        <div id="status" class="status loading">
+            ⏳ Carregando OpenCV.js...
+        </div>
+
+        <!-- Upload Section -->
+        <div id="uploadSection" class="upload-section" onclick="document.getElementById('fileInput').click()">
+            <h2>📁 Selecione uma Imagem de Criptograma</h2>
+            <p style="margin: 20px 0; color: #666;">
+                Arraste e solte ou clique para selecionar
+            </p>
+            <input type="file" id="fileInput" accept="image/*">
+            <button class="upload-btn" disabled id="uploadBtn">
+                Escolher Imagem
+            </button>
+            <p style="margin-top: 20px; font-size: 0.9em; color: #999;">
+                Formatos aceitos: PNG, JPG, JPEG
+            </p>
+        </div>
+
+        <!-- Progress -->
+        <div id="progressSection" style="display: none;">
+            <h3>⚙️ Processando...</h3>
+            <div class="progress-bar">
+                <div id="progressBar" class="progress-fill" style="width: 0%">0%</div>
+            </div>
+            <p id="progressText" style="text-align: center; color: #666; margin-top: 10px;">
+                Iniciando...
+            </p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="results" style="display: none;">
+            <div class="result-section">
+                <h3>📊 Informações da Imagem</h3>
+                <div id="imageInfo" class="info-box"></div>
+            </div>
+
+            <div class="grid">
+                <div class="result-section">
+                    <h3>1️⃣ Imagem Original</h3>
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+
+                <div class="result-section">
+                    <h3>2️⃣ Pré-processada</h3>
+                    <canvas id="preprocessedCanvas"></canvas>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="result-section">
+                    <h3>3️⃣ Detecção de Bordas</h3>
+                    <canvas id="edgesCanvas"></canvas>
+                </div>
+
+                <div class="result-section">
+                    <h3>4️⃣ Grade Detectada</h3>
+                    <canvas id="gridCanvas"></canvas>
+                </div>
+            </div>
+
+            <div class="result-section">
+                <h3>📈 Estatísticas</h3>
+                <div id="stats" class="info-box"></div>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        let cvReady = false;
+        const log = [];
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            log.push({ timestamp, message, type });
+            
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function onOpenCvReady() {
+            cvReady = true;
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status ready';
+            statusDiv.innerHTML = '✅ OpenCV.js carregado! Pronto para processar imagens.';
+            
+            document.getElementById('uploadBtn').disabled = false;
+            
+            addLog('OpenCV.js carregado com sucesso!', 'success');
+            addLog(`Versão OpenCV: ${cv.getBuildInformation().split('\\n')[0]}`, 'info');
+        }
+
+        // Aguardar carregamento se já estiver carregado
+        if (typeof cv !== 'undefined') {
+            onOpenCvReady();
+        }
+
+        // Drag and drop
+        const uploadSection = document.getElementById('uploadSection');
+        
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // File input
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function updateProgress(percent, text) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = Math.round(percent) + '%';
+            progressText.textContent = text;
+        }
+
+        function handleFile(file) {
+            if (!cvReady) {
+                alert('OpenCV ainda está carregando. Aguarde...');
+                return;
+            }
+
+            addLog(`Arquivo selecionado: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+
+            // Mostrar progresso
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            
+            updateProgress(10, 'Carregando imagem...');
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const img = new Image();
+                
+                img.onload = function() {
+                    updateProgress(20, 'Imagem carregada. Iniciando processamento...');
+                    addLog(`Dimensões: ${img.width}x${img.height}`, 'info');
+                    
+                    processImage(img);
+                };
+                
+                img.onerror = function() {
+                    addLog('Erro ao carregar imagem!', 'error');
+                    document.getElementById('status').className = 'status error';
+                    document.getElementById('status').innerHTML = '❌ Erro ao carregar imagem!';
+                };
+                
+                img.src = e.target.result;
+            };
+            
+            reader.onerror = function() {
+                addLog('Erro ao ler arquivo!', 'error');
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        function processImage(img) {
+            try {
+                // 1. Converter para canvas
+                updateProgress(30, 'Convertendo para processamento...');
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // Mostrar original
+                const originalCanvas = document.getElementById('originalCanvas');
+                originalCanvas.width = img.width;
+                originalCanvas.height = img.height;
+                const originalCtx = originalCanvas.getContext('2d');
+                originalCtx.drawImage(img, 0, 0);
+
+                // 2. Converter para Mat
+                updateProgress(40, 'Convertendo para OpenCV Mat...');
+                addLog('Convertendo para OpenCV Mat...', 'info');
+                
+                let src = cv.imread(canvas);
+                
+                // 3. Grayscale
+                updateProgress(50, 'Convertendo para grayscale...');
+                addLog('Aplicando conversão grayscale...', 'info');
+                
+                let gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+                // 4. Gaussian Blur
+                updateProgress(60, 'Aplicando Gaussian Blur...');
+                addLog('Aplicando Gaussian Blur (kernel 5x5)...', 'info');
+                
+                let blurred = new cv.Mat();
+                let ksize = new cv.Size(5, 5);
+                cv.GaussianBlur(gray, blurred, ksize, 0);
+
+                // 5. Threshold Adaptativo
+                updateProgress(70, 'Aplicando threshold adaptativo...');
+                addLog('Aplicando threshold adaptativo...', 'info');
+                
+                let thresh = new cv.Mat();
+                cv.adaptiveThreshold(
+                    blurred, thresh, 255,
+                    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    cv.THRESH_BINARY, 11, 2
+                );
+
+                // Mostrar pré-processada
+                const preprocessedCanvas = document.getElementById('preprocessedCanvas');
+                preprocessedCanvas.width = thresh.cols;
+                preprocessedCanvas.height = thresh.rows;
+                cv.imshow(preprocessedCanvas, thresh);
+
+                // 6. Detecção de bordas
+                updateProgress(80, 'Detectando bordas...');
+                addLog('Aplicando detecção de bordas (Canny)...', 'info');
+                
+                let edges = new cv.Mat();
+                cv.Canny(thresh, edges, 50, 150);
+
+                // Mostrar bordas
+                const edgesCanvas = document.getElementById('edgesCanvas');
+                edgesCanvas.width = edges.cols;
+                edgesCanvas.height = edges.rows;
+                cv.imshow(edgesCanvas, edges);
+
+                // 7. Detectar linhas
+                updateProgress(90, 'Detectando linhas...');
+                addLog('Detectando linhas com Hough Transform...', 'info');
+                
+                let lines = new cv.Mat();
+                cv.HoughLinesP(edges, lines, 1, Math.PI / 180, 100, 100, 10);
+
+                // Desenhar linhas
+                let color = new cv.Scalar(0, 255, 0);
+                let gridImg = src.clone();
+                
+                let horizontalLines = 0;
+                let verticalLines = 0;
+
+                for (let i = 0; i < lines.rows; i++) {
+                    let x1 = lines.data32S[i * 4];
+                    let y1 = lines.data32S[i * 4 + 1];
+                    let x2 = lines.data32S[i * 4 + 2];
+                    let y2 = lines.data32S[i * 4 + 3];
+                    
+                    let angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+                    let absAngle = Math.abs(angle);
+                    
+                    if (absAngle < 10 || absAngle > 170) {
+                        horizontalLines++;
+                    } else if (Math.abs(absAngle - 90) < 10) {
+                        verticalLines++;
+                    }
+                    
+                    let point1 = new cv.Point(x1, y1);
+                    let point2 = new cv.Point(x2, y2);
+                    cv.line(gridImg, point1, point2, color, 2);
+                }
+
+                // Mostrar grid
+                const gridCanvas = document.getElementById('gridCanvas');
+                gridCanvas.width = gridImg.cols;
+                gridCanvas.height = gridImg.rows;
+                cv.imshow(gridCanvas, gridImg);
+
+                // 8. Finalizar
+                updateProgress(100, 'Processamento concluído!');
+                addLog(`Linhas detectadas: ${lines.rows} (H: ${horizontalLines}, V: ${verticalLines})`, 'success');
+                
+                // Mostrar resultados
+                document.getElementById('results').style.display = 'block';
+                
+                // Informações
+                document.getElementById('imageInfo').innerHTML = `
+                    <p><strong>Dimensões:</strong> ${img.width} x ${img.height} pixels</p>
+                    <p><strong>Largura:</strong> ${img.width}px</p>
+                    <p><strong>Altura:</strong> ${img.height}px</p>
+                    <p><strong>Aspecto:</strong> ${(img.width / img.height).toFixed(2)}</p>
+                `;
+
+                document.getElementById('stats').innerHTML = `
+                    <p><strong>Total de linhas:</strong> ${lines.rows}</p>
+                    <p><strong>Linhas horizontais:</strong> ~${horizontalLines}</p>
+                    <p><strong>Linhas verticais:</strong> ~${verticalLines}</p>
+                    <p><strong>Linhas estimadas:</strong> ${Math.max(horizontalLines, verticalLines) + 1}</p>
+                    <p><strong>Colunas estimadas:</strong> ${Math.min(horizontalLines, verticalLines) + 1}</p>
+                `;
+
+                // Limpar memória
+                src.delete();
+                gray.delete();
+                blurred.delete();
+                thresh.delete();
+                edges.delete();
+                lines.delete();
+                gridImg.delete();
+
+                addLog('✅ Processamento concluído com sucesso!', 'success');
+                addLog('Memória OpenCV liberada.', 'info');
+
+                setTimeout(() => {
+                    document.getElementById('progressSection').style.display = 'none';
+                }, 2000);
+
+            } catch (error) {
+                addLog(`ERRO: ${error.message}`, 'error');
+                console.error('Erro no processamento:', error);
+                
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').innerHTML = '❌ Erro no processamento! Veja o console.';
+            }
+        }
+
+        // Log inicial
+        addLog('Página carregada. Aguardando OpenCV...', 'info');
+    </script>
+</body>
+</html>

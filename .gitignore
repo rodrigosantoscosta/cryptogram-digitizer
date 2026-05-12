@@ -1,0 +1,34 @@
+# Dependencias
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+dev-server.log
+
+# Playwright CLI
+/.playwright-cli/
+
+# Serena
+/.serena/
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testes
+coverage/
+
+# Contexto legacy
+context/

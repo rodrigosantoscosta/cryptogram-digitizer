@@ -42,7 +42,7 @@ export interface Contour {
 }
 
 /**
- * Estrutura da tabela detectada
+ * Estrutura da tabela detectada (legado — usar GridResult para novas implementações)
  */
 export interface TableStructure {
   rows: number;
@@ -55,17 +55,40 @@ export interface TableStructure {
 }
 
 /**
+ * Resultado da detecção de grade (GridDetector)
+ *
+ * Substitui TableStructure como saída primária da detecção de células.
+ * Suporta colunas de larguras não-uniformes (ex.: coluna de pistas mais larga).
+ */
+export interface GridResult {
+  /** Bounding box da tabela em coordenadas da imagem original */
+  roi: BoundingBox;
+  /** Posições Y das linhas horizontais — absolutas, inclui as bordas superior e inferior */
+  rowPositions: number[];
+  /** Posições X das linhas verticais — absolutas, inclui as bordas esquerda e direita */
+  colPositions: number[];
+  /** Largura de cada coluna (length === cols) */
+  colWidths: number[];
+  /** Altura de cada linha (length === rows) */
+  rowHeights: number[];
+  /** Número de linhas de células */
+  rows: number;
+  /** Número de colunas de células */
+  cols: number;
+}
+
+/**
  * Características extraídas de um símbolo
  */
 export interface SymbolFeatures {
   area: number;
   perimeter: number;
   aspectRatio: number;
-  moments: number[]; // Hu Moments (7 valores)
+  moments: number[]; // Hu Moments (7 valores) — já log-normalizados
   histogram: number[];
   centerOfMass: Point;
-  extent?: number; // Razão área/área do bounding box
-  solidity?: number; // Razão área/área do convex hull
+  extent?: number;
+  solidity?: number;
 }
 
 /**
@@ -111,7 +134,7 @@ export interface UniqueSymbol {
 /**
  * Status de processamento
  */
-export type ProcessingStage = 
+export type ProcessingStage =
   | 'idle'
   | 'preprocessing'
   | 'detecting'
@@ -134,6 +157,7 @@ export interface ProcessingStatus {
 export interface ProcessedData {
   preprocessedImage: ImageData;
   tableStructure: TableStructure;
+  grid: GridResult;
   clues: ClueResult[];
   extractedSymbols: ExtractedSymbol[];
   uniqueSymbols: UniqueSymbol[];

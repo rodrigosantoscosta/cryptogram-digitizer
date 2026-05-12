@@ -1,6 +1,6 @@
 /**
  * SymbolExtractor - Extração e análise de símbolos
- * 
+ *
  * Este módulo extrai símbolos individuais de células da tabela,
  * normaliza-os e extrai características para classificação.
  */
@@ -10,7 +10,8 @@ import type {
   SymbolFeatures,
   Contour,
   BoundingBox,
-  CellPosition
+  CellPosition,
+  GridResult
 } from '../../types/image';
 
 declare const cv: any;
@@ -18,45 +19,52 @@ declare const cv: any;
 export class SymbolExtractor {
   /**
    * Verifica se uma célula está vazia
-   * 
+   *
    * @param cellImage - ImageData da célula
-   * @param threshold - Porcentagem mínima de pixels não-brancos
+   * @param threshold - Porcentagem mínima de pixels não-brancos (padrão 0.02)
    * @returns true se célula está vazia
    */
-  static isEmpty(cellImage: ImageData, threshold: number = 0.05): boolean {
+  static isEmpty(cellImage: ImageData, threshold: number = 0.02): boolean {
     const src = cv.matFromImageData(cellImage);
+    let gray = new cv.Mat();
 
     try {
-      // Contar pixels não-brancos (assumindo imagem binária)
-      const nonWhitePixels = cv.countNonZero(src);
-      const totalPixels = src.rows * src.cols;
+      // countNonZero exige 1 canal — converter para grayscale se necessário
+      if (src.channels() > 1) {
+        cv.cvtColor(src, gray, src.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
+      } else {
+        src.copyTo(gray);
+      }
 
-      // Se menos de threshold% são não-brancos, considerar vazia
+      const nonWhitePixels = cv.countNonZero(gray);
+      const totalPixels = gray.rows * gray.cols;
+
       return nonWhitePixels / totalPixels < threshold;
     } finally {
       src.delete();
+      gray.delete();
     }
   }
 
   /**
    * Remove background da célula usando threshold Otsu
-   * 
-   * @param cellImage - ImageData da célula
-   * @returns Célula com fundo removido
    */
   static removeBackground(cellImage: ImageData): ImageData {
     const src = cv.matFromImageData(cellImage);
+    let gray = new cv.Mat();
     const dst = new cv.Mat();
 
     try {
-      // Aplicar threshold Otsu invertido (símbolo branco, fundo preto)
-      cv.threshold(
-        src,
-        dst,
-        0,
-        255,
-        cv.THRESH_BINARY_INV + cv.THRESH_OTSU
-      );
+      // Converter para grayscale se necessário (threshold requer 1 canal)
+      if (src.channels() === 4) {
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      } else if (src.channels() === 3) {
+        cv.cvtColor(src, gray, cv.COLOR_RGB2GRAY);
+      } else {
+        src.copyTo(gray);
+      }
+
+      cv.threshold(gray, dst, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
 
       const canvas = document.createElement('canvas');
       canvas.width = dst.cols;
@@ -67,56 +75,51 @@ export class SymbolExtractor {
       return ctx.getImageData(0, 0, dst.cols, dst.rows);
     } finally {
       src.delete();
+      gray.delete();
       dst.delete();
     }
   }
 
   /**
    * Encontra o contorno principal do símbolo
-   * 
-   * @param cellImage - ImageData da célula com fundo removido
-   * @returns Contorno do símbolo
    */
   static findSymbolContour(cellImage: ImageData): Contour {
     const src = cv.matFromImageData(cellImage);
+    let binary = new cv.Mat();
     const contours = new cv.MatVector();
     const hierarchy = new cv.Mat();
 
     try {
-      // Encontrar todos os contornos
-      cv.findContours(
-        src,
-        contours,
-        hierarchy,
-        cv.RETR_EXTERNAL,
-        cv.CHAIN_APPROX_SIMPLE
-      );
+      // findContours exige 8-bit single-channel — converter se necessário
+      if (src.channels() > 1) {
+        const gray = new cv.Mat();
+        cv.cvtColor(src, gray, src.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
+        cv.threshold(gray, binary, 127, 255, cv.THRESH_BINARY);
+        gray.delete();
+      } else {
+        src.copyTo(binary);
+      }
+
+      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
       if (contours.size() === 0) {
         throw new Error('Nenhum contorno encontrado');
       }
 
-      // Encontrar o maior contorno (assumir que é o símbolo)
       let maxArea = 0;
       let maxContourIdx = -1;
 
       for (let i = 0; i < contours.size(); i++) {
-        const contour = contours.get(i);
-        const area = cv.contourArea(contour);
-
+        const area = cv.contourArea(contours.get(i));
         if (area > maxArea) {
           maxArea = area;
           maxContourIdx = i;
         }
       }
 
-      if (maxContourIdx === -1) {
-        throw new Error('Nenhum contorno válido encontrado');
-      }
+      if (maxContourIdx === -1) throw new Error('Nenhum contorno válido encontrado');
 
       const mainContour = contours.get(maxContourIdx);
-
-      // Obter bounding box
       const boundingRect = cv.boundingRect(mainContour);
       const boundingBox: BoundingBox = {
         x: boundingRect.x,
@@ -125,26 +128,16 @@ export class SymbolExtractor {
         height: boundingRect.height
       };
 
-      // Calcular perímetro
       const perimeter = cv.arcLength(mainContour, true);
-
-      // Converter contorno para array de pontos
       const points = [];
       for (let i = 0; i < mainContour.rows; i++) {
-        points.push({
-          x: mainContour.data32S[i * 2],
-          y: mainContour.data32S[i * 2 + 1]
-        });
+        points.push({ x: mainContour.data32S[i * 2], y: mainContour.data32S[i * 2 + 1] });
       }
 
-      return {
-        points,
-        boundingBox,
-        area: maxArea,
-        perimeter
-      };
+      return { points, boundingBox, area: maxArea, perimeter };
     } finally {
       src.delete();
+      binary.delete();
       contours.delete();
       hierarchy.delete();
     }
@@ -152,18 +145,12 @@ export class SymbolExtractor {
 
   /**
    * Recorta símbolo usando o bounding box
-   * 
-   * @param cellImage - ImageData da célula
-   * @param contour - Contorno do símbolo
-   * @returns Imagem recortada do símbolo
    */
   static cropSymbol(cellImage: ImageData, contour: Contour): ImageData {
     const src = cv.matFromImageData(cellImage);
 
     try {
       const { x, y, width, height } = contour.boundingBox;
-
-      // Adicionar pequena margem
       const margin = 5;
       const rect = new cv.Rect(
         Math.max(0, x - margin),
@@ -173,15 +160,12 @@ export class SymbolExtractor {
       );
 
       const roi = src.roi(rect);
-
       const canvas = document.createElement('canvas');
       canvas.width = roi.cols;
       canvas.height = roi.rows;
       const ctx = canvas.getContext('2d')!;
       cv.imshow(canvas, roi);
-
       const result = ctx.getImageData(0, 0, roi.cols, roi.rows);
-
       roi.delete();
 
       return result;
@@ -191,44 +175,30 @@ export class SymbolExtractor {
   }
 
   /**
-   * Normaliza símbolo para tamanho padrão
-   * 
-   * @param symbolImage - ImageData do símbolo
-   * @param size - Tamanho padrão (width = height)
-   * @returns Símbolo normalizado
+   * Normaliza símbolo para tamanho padrão com padding centralizado
    */
-  static normalizeSymbol(
-    symbolImage: ImageData,
-    size: number = 64
-  ): ImageData {
+  static normalizeSymbol(symbolImage: ImageData, size: number = 64): ImageData {
     const src = cv.matFromImageData(symbolImage);
     const dst = new cv.Mat();
 
     try {
-      // Redimensionar mantendo aspect ratio
       const aspectRatio = src.cols / src.rows;
       let newWidth = size;
       let newHeight = size;
 
       if (aspectRatio > 1) {
-        // Mais largo que alto
         newHeight = Math.round(size / aspectRatio);
       } else {
-        // Mais alto que largo
         newWidth = Math.round(size * aspectRatio);
       }
 
       const dsize = new cv.Size(newWidth, newHeight);
       cv.resize(src, dst, dsize, 0, 0, cv.INTER_AREA);
 
-      // Criar imagem quadrada com padding
       const square = new cv.Mat.zeros(size, size, dst.type());
       const xOffset = Math.floor((size - newWidth) / 2);
       const yOffset = Math.floor((size - newHeight) / 2);
-
-      const roi = square.roi(
-        new cv.Rect(xOffset, yOffset, newWidth, newHeight)
-      );
+      const roi = square.roi(new cv.Rect(xOffset, yOffset, newWidth, newHeight));
       dst.copyTo(roi);
       roi.delete();
 
@@ -237,9 +207,7 @@ export class SymbolExtractor {
       canvas.height = square.rows;
       const ctx = canvas.getContext('2d')!;
       cv.imshow(canvas, square);
-
       const result = ctx.getImageData(0, 0, square.cols, square.rows);
-
       square.delete();
 
       return result;
@@ -250,92 +218,60 @@ export class SymbolExtractor {
   }
 
   /**
-   * Extrai características (features) do símbolo
-   * 
-   * @param symbolImage - ImageData do símbolo normalizado
-   * @returns Características extraídas
+   * Extrai características (features) do símbolo.
+   * Os Hu Moments são log-normalizados AQUI e não devem ser re-normalizados downstream.
    */
   static extractFeatures(symbolImage: ImageData): SymbolFeatures {
-    const src = cv.matFromImageData(symbolImage);
+    const raw = cv.matFromImageData(symbolImage);
+    let src = new cv.Mat();
+    // moments, countNonZero, findContours, calcHist precisam de 1 canal
+    if (raw.channels() > 1) {
+      cv.cvtColor(raw, src, raw.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
+    } else {
+      raw.copyTo(src);
+    }
+    raw.delete();
 
     try {
-      // 1. Calcular momentos
       const moments = cv.moments(src, true);
 
-      // 2. Calcular Hu Moments (invariantes geométricos)
       const huMoments = new cv.Mat();
       cv.HuMoments(moments, huMoments);
-
       const huMomentsArray: number[] = [];
       for (let i = 0; i < 7; i++) {
-        // Aplicar log para normalizar valores
         const value = huMoments.data64F[i];
-        const logValue = -Math.sign(value) * Math.log10(Math.abs(value) + 1);
-        huMomentsArray.push(logValue);
+        huMomentsArray.push(-Math.sign(value) * Math.log10(Math.abs(value) + 1));
       }
-
       huMoments.delete();
 
-      // 3. Calcular área
       const area = cv.countNonZero(src);
 
-      // 4. Encontrar contorno para perímetro
       const contours = new cv.MatVector();
       const hierarchy = new cv.Mat();
-      cv.findContours(
-        src,
-        contours,
-        hierarchy,
-        cv.RETR_EXTERNAL,
-        cv.CHAIN_APPROX_SIMPLE
-      );
-
+      cv.findContours(src, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
       let perimeter = 0;
       if (contours.size() > 0) {
-        const mainContour = contours.get(0);
-        perimeter = cv.arcLength(mainContour, true);
+        perimeter = cv.arcLength(contours.get(0), true);
       }
-
       contours.delete();
       hierarchy.delete();
 
-      // 5. Calcular aspect ratio
       const boundingBox = this.getBoundingBox(src);
-      const aspectRatio = boundingBox.width / boundingBox.height;
-
-      // 6. Calcular centro de massa
+      const aspectRatio = boundingBox.width / (boundingBox.height || 1);
       const centerOfMass = {
-        x: moments.m10 / moments.m00,
-        y: moments.m01 / moments.m00
+        x: moments.m00 > 0 ? moments.m10 / moments.m00 : 0,
+        y: moments.m00 > 0 ? moments.m01 / moments.m00 : 0
       };
-
-      // 7. Calcular histograma
       const histogram = this.calculateHistogram(src);
-
-      // 8. Calcular extent (razão área/área do bounding box)
       const bbArea = boundingBox.width * boundingBox.height;
       const extent = bbArea > 0 ? area / bbArea : 0;
 
-      return {
-        area,
-        perimeter,
-        aspectRatio,
-        moments: huMomentsArray,
-        histogram,
-        centerOfMass,
-        extent
-      };
+      return { area, perimeter, aspectRatio, moments: huMomentsArray, histogram, centerOfMass, extent };
     } finally {
       src.delete();
     }
   }
 
-  /**
-   * Calcula histograma de pixels
-   * 
-   * @param src - cv.Mat da imagem
-   * @returns Array com histograma
-   */
   private static calculateHistogram(src: any): number[] {
     const histogram: number[] = [];
     const hist = new cv.Mat();
@@ -343,19 +279,8 @@ export class SymbolExtractor {
     srcVec.push_back(src);
 
     try {
-      cv.calcHist(
-        srcVec,
-        [0], // canais
-        new cv.Mat(), // máscara
-        hist,
-        [256], // histSize
-        [0, 256] // ranges
-      );
-
-      for (let i = 0; i < hist.rows; i++) {
-        histogram.push(hist.data32F[i]);
-      }
-
+      cv.calcHist(srcVec, [0], new cv.Mat(), hist, [256], [0, 256]);
+      for (let i = 0; i < hist.rows; i++) histogram.push(hist.data32F[i]);
       return histogram;
     } finally {
       hist.delete();
@@ -363,148 +288,203 @@ export class SymbolExtractor {
     }
   }
 
-  /**
-   * Obtém bounding box de uma imagem
-   * 
-   * @param src - cv.Mat da imagem
-   * @returns BoundingBox
-   */
   private static getBoundingBox(src: any): BoundingBox {
+    // src já deve ser 1 canal — mas proteger defensivamente
+    let gray = src;
+    let needsDelete = false;
+    if (src.channels && src.channels() > 1) {
+      gray = new cv.Mat();
+      cv.cvtColor(src, gray, src.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
+      needsDelete = true;
+    }
+
     const contours = new cv.MatVector();
     const hierarchy = new cv.Mat();
 
     try {
-      cv.findContours(
-        src,
-        contours,
-        hierarchy,
-        cv.RETR_EXTERNAL,
-        cv.CHAIN_APPROX_SIMPLE
-      );
-
-      if (contours.size() === 0) {
-        return { x: 0, y: 0, width: src.cols, height: src.rows };
-      }
-
+      cv.findContours(gray, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+      if (contours.size() === 0) return { x: 0, y: 0, width: gray.cols, height: gray.rows };
       const rect = cv.boundingRect(contours.get(0));
-
-      return {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height
-      };
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     } finally {
       contours.delete();
       hierarchy.delete();
+      if (needsDelete) gray.delete();
     }
   }
 
   /**
-   * Gera hash único para um símbolo baseado em suas características
-   * 
-   * @param symbolImage - ImageData do símbolo
-   * @returns Hash string
+   * Gera um perceptual hash (pHash) via DCT — robusto a colisões.
+   *
+   * Algoritmo:
+   *  1. Redimensionar para 32×32
+   *  2. DCT 2D sobre bloco 8×8 de baixas frequências
+   *  3. Comparar cada coeficiente com a mediana → 64 bits
+   *  4. Retornar como string hex "sym_XXXXXXXXXXXXXXXX"
    */
   static generateSymbolHash(symbolImage: ImageData): string {
-    // Simples hash baseado em pixels
-    const data = symbolImage.data;
-    let hash = 0;
+    const SIZE = 32;
+    const HASH_SIZE = 8;
 
-    // Amostrar pixels em grid 8x8
-    const step = Math.floor(symbolImage.width / 8);
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = symbolImage.width;
+    tmpCanvas.height = symbolImage.height;
+    tmpCanvas.getContext('2d')!.putImageData(symbolImage, 0, 0);
 
-    for (let y = 0; y < symbolImage.height; y += step) {
-      for (let x = 0; x < symbolImage.width; x += step) {
-        const idx = (y * symbolImage.width + x) * 4;
-        const value = data[idx];
-        hash = (hash << 5) - hash + value;
-        hash = hash & hash; // Converter para 32-bit integer
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(tmpCanvas, 0, 0, SIZE, SIZE);
+    const resized = ctx.getImageData(0, 0, SIZE, SIZE);
+
+    const pixels: number[][] = [];
+    for (let y = 0; y < SIZE; y++) {
+      pixels[y] = [];
+      for (let x = 0; x < SIZE; x++) {
+        const idx = (y * SIZE + x) * 4;
+        pixels[y][x] =
+          0.299 * resized.data[idx] +
+          0.587 * resized.data[idx + 1] +
+          0.114 * resized.data[idx + 2];
       }
     }
 
-    return `sym_${Math.abs(hash).toString(36)}`;
+    const dct: number[][] = [];
+    for (let u = 0; u < HASH_SIZE; u++) {
+      dct[u] = [];
+      for (let v = 0; v < HASH_SIZE; v++) {
+        let sum = 0;
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            sum +=
+              pixels[y][x] *
+              Math.cos(((2 * x + 1) * u * Math.PI) / (2 * SIZE)) *
+              Math.cos(((2 * y + 1) * v * Math.PI) / (2 * SIZE));
+          }
+        }
+        dct[u][v] = sum;
+      }
+    }
+
+    const flatDct: number[] = [];
+    for (let u = 0; u < HASH_SIZE; u++) {
+      for (let v = 0; v < HASH_SIZE; v++) {
+        if (u === 0 && v === 0) continue;
+        flatDct.push(dct[u][v]);
+      }
+    }
+
+    const sorted = [...flatDct].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+
+    let hashHigh = 0;
+    let hashLow = 0;
+    for (let i = 0; i < flatDct.length; i++) {
+      const bit = flatDct[i] > median ? 1 : 0;
+      if (i < 32) hashHigh = (hashHigh << 1) | bit;
+      else hashLow = (hashLow << 1) | bit;
+    }
+
+    return `sym_${(hashHigh >>> 0).toString(16).padStart(8, '0')}${(hashLow >>> 0).toString(16).padStart(8, '0')}`;
   }
 
   /**
-   * Pipeline completo de extração de símbolo
-   * 
-   * @param cellImage - ImageData da célula
-   * @param position - Posição da célula no grid
-   * @returns Símbolo extraído com características
+   * Calcula distância de Hamming entre dois pHashes.
+   * 0 = idêntico, 64 = completamente diferente.
+   */
+  static hammingDistance(hash1: string, hash2: string): number {
+    const h1 = hash1.replace('sym_', '');
+    const h2 = hash2.replace('sym_', '');
+    if (h1.length !== h2.length) return 64;
+
+    let distance = 0;
+    for (let i = 0; i < h1.length; i += 8) {
+      const v1 = parseInt(h1.slice(i, i + 8), 16);
+      const v2 = parseInt(h2.slice(i, i + 8), 16);
+      let xor = (v1 ^ v2) >>> 0;
+      xor = xor - ((xor >> 1) & 0x55555555);
+      xor = (xor & 0x33333333) + ((xor >> 2) & 0x33333333);
+      distance += (((xor + (xor >> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+    }
+    return distance;
+  }
+
+  /**
+   * Pipeline completo de extração de um símbolo de uma célula.
    */
   static async extractSymbol(
     cellImage: ImageData,
     position: CellPosition
   ): Promise<ExtractedSymbol | null> {
-    // 1. Verificar se célula está vazia
-    if (this.isEmpty(cellImage)) {
-      return null;
-    }
+    // Converter para grayscale uma vez (todas as operações cv precisam de 1 canal)
+    const toGray = (img: ImageData): ImageData => {
+      const src = cv.matFromImageData(img);
+      const dst = new cv.Mat();
+      try {
+        if (src.channels() === 4)      cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+        else if (src.channels() === 3) cv.cvtColor(src, dst, cv.COLOR_RGB2GRAY);
+        else                           src.copyTo(dst);
+        const c = document.createElement('canvas');
+        c.width = dst.cols; c.height = dst.rows;
+        cv.imshow(c, dst);
+        return c.getContext('2d')!.getImageData(0, 0, c.width, c.height);
+      } finally { src.delete(); dst.delete(); }
+    };
+
+    const gray = toGray(cellImage);
+
+    if (this.isEmpty(gray)) return null;
 
     try {
-      // 2. Remover background
-      const cleaned = this.removeBackground(cellImage);
-
-      // 3. Encontrar contorno
-      const contour = this.findSymbolContour(cleaned);
-
-      // 4. Recortar símbolo
-      const cropped = this.cropSymbol(cleaned, contour);
-
-      // 5. Normalizar
+      const cleaned    = this.removeBackground(gray);
+      const contour    = this.findSymbolContour(cleaned);
+      const cropped    = this.cropSymbol(cleaned, contour);
       const normalized = this.normalizeSymbol(cropped, 64);
+      const features   = this.extractFeatures(normalized);
+      const hash       = this.generateSymbolHash(normalized);
 
-      // 6. Extrair características
-      const features = this.extractFeatures(normalized);
-
-      // 7. Gerar hash
-      const hash = this.generateSymbolHash(normalized);
-
-      return {
-        id: hash,
-        imageData: normalized,
-        features,
-        positions: [position],
-        hash
-      };
+      return { id: hash, imageData: normalized, features, positions: [position], hash };
     } catch (error) {
       console.error(`Erro ao extrair símbolo em (${position.row}, ${position.col}):`, error);
       return null;
     }
   }
 
+  // ─── Caminho primário: GridDetector ──────────────────────────────────────
+
   /**
-   * Extrai todos os símbolos de uma tabela
-   * 
+   * Extrai todos os símbolos usando GridResult (caminho primário).
+   *
+   * Utiliza GridDetector.extractCell() que opera diretamente sobre as
+   * posições absolutas da grade, sem depender de gridPoints[][] interpolados.
+   *
    * @param preprocessedImage - Imagem pré-processada
-   * @param tableStructure - Estrutura da tabela
-   * @param skipFirstColumn - Pular primeira coluna (pistas)
-   * @returns Array de símbolos extraídos
+   * @param grid              - Grade detectada por GridDetector.detect()
+   * @param skipFirstColumn   - Pular primeira coluna (coluna de pistas)
    */
-  static async extractAllSymbols(
+  static async extractAllSymbolsFromGrid(
     preprocessedImage: ImageData,
-    tableStructure: any,
+    grid: GridResult,
     skipFirstColumn: boolean = true
   ): Promise<ExtractedSymbol[]> {
+    const { GridDetector } = await import('./GridDetector');
     const symbols: ExtractedSymbol[] = [];
     const startCol = skipFirstColumn ? 1 : 0;
 
-    for (let row = 0; row < tableStructure.rows; row++) {
-      for (let col = startCol; col < tableStructure.cols; col++) {
-        // Extrair célula
-        const cellImage = await this.extractCellFromTable(
-          preprocessedImage,
-          row,
-          col,
-          tableStructure
-        );
-
-        // Extrair símbolo
-        const symbol = await this.extractSymbol(cellImage, { row, col });
-
-        if (symbol) {
-          symbols.push(symbol);
+    for (let row = 0; row < grid.rows; row++) {
+      for (let col = startCol; col < grid.cols; col++) {
+        try {
+          const cellImage = GridDetector.extractCell(preprocessedImage, row, col, grid);
+          const symbol = await this.extractSymbol(cellImage, { row, col });
+          if (symbol) symbols.push(symbol);
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          if (row === 0 && col === 1) {
+            // Logar detalhe apenas da primeira célula para não poluir
+            console.error(`[SymbolExtractor] erro detalhado (0,1): msg="${msg}" stack=${err?.stack || '(no stack)'}`);
+          }
+          // Continuar — não deixar uma célula ruim derrubar tudo
         }
       }
     }
@@ -512,18 +492,32 @@ export class SymbolExtractor {
     return symbols;
   }
 
+  // ─── Caminho legado: TableDetector ───────────────────────────────────────
+
   /**
-   * Método auxiliar para extrair célula
-   * (Delegaria para TableDetector.extractCell em produção)
+   * Extrai todos os símbolos de uma tabela via TableDetector (fallback legado).
+   *
+   * @param preprocessedImage - Imagem pré-processada
+   * @param tableStructure    - Estrutura da tabela (TableDetector)
+   * @param skipFirstColumn   - Pular primeira coluna
    */
-  private static async extractCellFromTable(
-    imageData: ImageData,
-    row: number,
-    col: number,
-    structure: any
-  ): Promise<ImageData> {
-    // Importar dinamicamente para evitar dependência circular
+  static async extractAllSymbols(
+    preprocessedImage: ImageData,
+    tableStructure: any,
+    skipFirstColumn: boolean = true
+  ): Promise<ExtractedSymbol[]> {
     const { TableDetector } = await import('./TableDetector');
-    return TableDetector.extractCell(imageData, row, col, structure);
+    const symbols: ExtractedSymbol[] = [];
+    const startCol = skipFirstColumn ? 1 : 0;
+
+    for (let row = 0; row < tableStructure.rows; row++) {
+      for (let col = startCol; col < tableStructure.cols; col++) {
+        const cellImage = TableDetector.extractCell(preprocessedImage, row, col, tableStructure);
+        const symbol = await this.extractSymbol(cellImage, { row, col });
+        if (symbol) symbols.push(symbol);
+      }
+    }
+
+    return symbols;
   }
 }

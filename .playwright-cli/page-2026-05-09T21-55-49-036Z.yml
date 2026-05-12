@@ -1,0 +1,32 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - link "🔤 Digitalizador de Criptogramas" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "📸 Upload" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "⚙️ Processamento" [ref=e9] [cursor=pointer]:
+          - /url: /processing
+        - link "📋 Mapeamento" [ref=e10] [cursor=pointer]:
+          - /url: /mapping
+  - generic [ref=e11]:
+    - heading "🧪 Teste do Pipeline — GridDetector" [level=1] [ref=e12]
+    - paragraph [ref=e13]:
+      - text: "Cadeia:"
+      - strong [ref=e14]: FFT
+      - text: → Hough → Contornos → Morfologia
+    - button "Choose File" [active] [ref=e15]
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: error
+        - generic [ref=e21]: Erro no processamento
+        - generic [ref=e19]: 0%
+      - generic [ref=e22]:
+        - paragraph [ref=e23]:
+          - strong [ref=e24]: "Erro:"
+          - text: cv.createCLAHE is not a function
+        - generic [ref=e25]: "TypeError: cv.createCLAHE is not a function at ImageProcessor.preprocess (http://localhost:5175/src/lib/image-processing/ImageProcessor.ts?t=1778363719825:344:24) at http://localhost:5175/src/hooks/useImageProcessor.ts?t=1778363719825:29:49 at http://localhost:5175/src/pages/TestPage.tsx?t=1778363719825:67:30 at withLogCapture (http://localhost:5175/src/pages/TestPage.tsx?t=1778363719825:42:12) at img.onload (http://localhost:5175/src/pages/TestPage.tsx?t=1778363719825:65:7)"
+    - generic [ref=e27]:
+      - paragraph [ref=e28]: 📷 Original
+      - img "original" [ref=e29]

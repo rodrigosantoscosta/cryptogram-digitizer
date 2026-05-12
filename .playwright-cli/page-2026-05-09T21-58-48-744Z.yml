@@ -1,0 +1,22 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - link "🔤 Digitalizador de Criptogramas" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "📸 Upload" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "⚙️ Processamento" [ref=e9] [cursor=pointer]:
+          - /url: /processing
+        - link "📋 Mapeamento" [ref=e10] [cursor=pointer]:
+          - /url: /mapping
+  - generic [ref=e11]:
+    - heading "🧪 Teste do Pipeline — GridDetector" [level=1] [ref=e12]
+    - paragraph [ref=e13]:
+      - text: "Cadeia:"
+      - strong [ref=e14]: FFT
+      - text: → Hough → Contornos → Morfologia
+    - button "Choose File" [ref=e15]
+    - generic [ref=e17]:
+      - generic [ref=e18]: idle
+      - generic [ref=e19]: 0%

@@ -1,0 +1,13 @@
+- generic [ref=e2]:
+  - heading "🔤 Digitalizador de Criptogramas" [level=1] [ref=e3]
+  - paragraph [ref=e4]: Teste do Módulo de Processamento de Imagem
+  - generic [ref=e5]: ✅ OpenCV.js carregado! Pronto para processar imagens.
+  - generic [ref=e6] [cursor=pointer]:
+    - heading "📁 Selecione uma Imagem de Criptograma" [level=2] [ref=e7]
+    - paragraph [ref=e8]: Arraste e solte ou clique para selecionar
+    - button "Escolher Imagem" [ref=e9]
+    - paragraph [ref=e10]: "Formatos aceitos: PNG, JPG, JPEG"
+  - generic [ref=e11]:
+    - generic [ref=e12]: "[6:40:07 PM] Página carregada. Aguardando OpenCV..."
+    - generic [ref=e13]: "[6:40:08 PM] OpenCV.js carregado com sucesso!"
+    - generic [ref=e14]: "[6:40:08 PM] OpenCV carregado (getBuildInformation não disponível)"

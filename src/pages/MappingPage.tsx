@@ -66,8 +66,8 @@ export function MappingPage() {
           <div style={styles.errorBanner}>
             <strong>⚠️ Problemas encontrados:</strong>
             <ul style={styles.errorList}>
-              {validation.errors.map((error, index) => (
-                <li key={index}>{error}</li>
+              {validation.errors.map((error: string) => (
+                <li key={error}>{error}</li>
               ))}
             </ul>
           </div>

@@ -1,5 +1,5 @@
-
 import type { PSM } from 'tesseract.js';
+
 export interface ClueResult {
   row: number;
   text: string;

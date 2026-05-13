@@ -1,7 +1,7 @@
 // src/hooks/usePuzzleSolver.ts
 import { useState, useCallback, useMemo } from 'react';
 import type { GridCell, SymbolMapping } from '@/types';
-import { SymbolMapper } from '@/lib/mapping/SymbolMapper';
+import { SymbolMapper } from '@/lib/image-processing/SymbolMapper';
 
 export function usePuzzleSolver(
   initialGrid: GridCell[][],

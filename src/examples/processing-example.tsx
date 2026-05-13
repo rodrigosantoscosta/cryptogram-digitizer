@@ -1,23 +1,18 @@
-import React, { useState } from 'react';
-import { ImageProcessor } from '../lib/image-processing/ImageProcessor';
-import { TableDetector } from '../lib/image-processing/TableDetector';
-import { SymbolExtractor } from '../lib/image-processing/SymbolExtractor';
-import { ImageData, ProcessingOptions } from '../types/image';
+// src/examples/processing-example.tsx
+import { useState } from 'react';
+import { ImageProcessor, TableDetector, SymbolExtractor } from '../lib';
+import type { ProcessedData } from '../types';
 
-export const ProcessingExample: React.FC = () => {
+export function ProcessingExample() {
   const [imageData, setImageData] = useState<ImageData | null>(null);
-  const [options, setOptions] = useState<ProcessingOptions>({
-    grayscale: true,
-    contrast: 30,
-    threshold: 150,
-  });
+  const [results, setResults] = useState<ProcessedData | null>(null);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -26,42 +21,47 @@ export const ProcessingExample: React.FC = () => {
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0);
         const imgData = ctx.getImageData(0, 0, img.width, img.height);
-        setImageData(imgData as unknown as ImageData);
+        setImageData(imgData);
       };
-      img.src = e.target?.result as string;
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  const processImage = () => {
+  const processImage = async () => {
     if (!imageData) return;
 
-    const processed = ImageProcessor.process(imageData, options);
-    const table = TableDetector.detect(processed);
-    const symbols = SymbolExtractor.extract(processed);
-
-    console.log('Processed Image:', processed);
-    console.log('Detected Table:', table);
-    console.log('Extracted Symbols:', symbols);
+    try {
+      const preprocessed = await ImageProcessor.preprocess(imageData);
+      const grid = GridDetector.detect(imageData); // GridDetector needs to be imported
+      const symbols = await SymbolExtractor.extractAllSymbolsFromGrid(imageData, grid);
+      
+      console.log('Processed symbols:', symbols.length);
+    } catch (error) {
+      console.error('Error processing image:', error);
+    }
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Image Processing Example</h1>
-      <input type="file" accept="image/*" onChange={handleImageUpload} />
+    <div>
+      <input type="file" onChange={handleFileChange} accept="image/*" />
       <button onClick={processImage} disabled={!imageData}>
         Process Image
       </button>
-      <div style={{ marginTop: '20px' }}>
-        <label>
-          <input
-            type="checkbox"
-            checked={options.grayscale}
-            onChange={(e) => setOptions({ ...options, grayscale: e.target.checked })}
-          />
-          Grayscale
-        </label>
-      </div>
+      {results && (
+        <div>
+          <h3>Results:</h3>
+          <pre>{JSON.stringify(results.tableStructure, null, 2)}</pre>
+        </div>
+      )}
     </div>
   );
+}
+
+// Mock GridDetector for example
+const GridDetector = {
+  detect: (_img: ImageData) => ({
+    rows: 10, cols: 10, roi: { x:0,y:0,width:100,height:100 },
+    rowPositions: [], colPositions: [], colWidths: [], rowHeights: []
+  })
 };

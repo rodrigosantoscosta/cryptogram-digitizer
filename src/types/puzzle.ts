@@ -1,19 +1,8 @@
 // src/types/puzzle.ts
+import type { TableStructure, GridResult } from './image';
 import type { ClueResult } from './ocr';
 import type { ExtractedSymbol, UniqueSymbol, SymbolMapping } from './symbol';
 import type { GridCell } from './grid';
-
-export interface CellPosition {
-  row: number;
-  col: number;
-}
-
-export interface TableStructure {
-  rows: number;
-  cols: number;
-  cellWidth: number;
-  cellHeight: number;
-}
 
 export interface ValidationError {
   type: 'duplicate' | 'unmapped' | 'incomplete';
@@ -24,6 +13,7 @@ export interface ValidationError {
 export interface ProcessedData {
   preprocessedImage: ImageData;
   tableStructure: TableStructure;
+  grid: GridResult;
   clues: ClueResult[];
   extractedSymbols: ExtractedSymbol[];
   uniqueSymbols: UniqueSymbol[];
@@ -52,4 +42,11 @@ export interface PuzzleState {
   processedData: ProcessedData;
   solution: PuzzleSolution;
   mapping: SymbolMapping;
+}
+
+export interface ProcessingStatus {
+  stage: 'idle' | 'preprocessing' | 'detecting' | 'extracting' | 'classifying' | 'ocr' | 'complete' | 'error';
+  progress: number;
+  currentStep: string;
+  error: Error | null;
 }

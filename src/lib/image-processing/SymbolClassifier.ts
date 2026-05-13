@@ -8,32 +8,15 @@
 import type {
   ExtractedSymbol,
   SymbolFeatures,
-  CellPosition
-} from '../../types/image';
-
-export interface SymbolCluster {
-  id: string;
-  representativeSymbol: ExtractedSymbol;
-  members: ExtractedSymbol[];
-  avgFeatures: SymbolFeatures;
-  count: number;
-}
-
-export interface UniqueSymbol {
-  clusterId: string;
-  symbol: ExtractedSymbol;
-  occurrences: CellPosition[];
-  mappedLetter: string | null;
-}
+  CellPosition,
+  UniqueSymbol,
+  SymbolCluster
+} from '@/types';
 
 export class SymbolClassifier {
 
   /**
    * Compara dois símbolos calculando similaridade (0-1)
-   *
-   * @param symbol1 - Primeiro símbolo
-   * @param symbol2 - Segundo símbolo
-   * @returns Similaridade (0 = diferente, 1 = idêntico)
    */
   static compareSymbols(
     symbol1: ExtractedSymbol,
@@ -49,20 +32,6 @@ export class SymbolClassifier {
 
   /**
    * Calcula distância entre características de dois símbolos.
-   *
-   * Fix: Os Hu Moments armazenados em `features.moments` já são
-   * log-normalizados em `SymbolExtractor.extractFeatures`. A aplicação
-   * anterior de log10 novamente aqui era uma dupla normalização que
-   * distorcia a distância calculada. Agora usamos os valores diretamente.
-   *
-   * Pesos:
-   *  - Área: 20%
-   *  - Aspect Ratio: 30%
-   *  - Hu Moments: 50% (mais importante)
-   *
-   * @param features1 - Características do primeiro símbolo
-   * @param features2 - Características do segundo símbolo
-   * @returns Distância normalizada (0 = idêntico, >0 = diferente)
    */
   static calculateFeatureDistance(
     features1: SymbolFeatures,
@@ -82,7 +51,6 @@ export class SymbolClassifier {
     distance += aspectDist * 0.3;
 
     // 3. Distância de Hu Moments (peso: 0.5)
-    //    Fix: os momentos já estão log-normalizados — NÃO aplicar log novamente.
     let momentsDist = 0;
     for (let i = 0; i < 7; i++) {
       momentsDist += Math.abs(features1.moments[i] - features2.moments[i]);
@@ -94,17 +62,6 @@ export class SymbolClassifier {
 
   /**
    * Agrupa símbolos similares em clusters com refinamento via Lloyd's step.
-   *
-   * Algoritmo:
-   *  1. Greedy clustering: cada símbolo não atribuído inicia um cluster e
-   *     absorve os vizinhos similares (threshold de similaridade).
-   *  2. Lloyd's re-assignment: cada símbolo é re-atribuído ao cluster cujo
-   *     centróide (avgFeatures) é mais próximo. Uma iteração é suficiente
-   *     para corrigir os erros do representante greedy.
-   *
-   * @param symbols - Array de símbolos extraídos
-   * @param threshold - Threshold de similaridade (0-1, padrão: 0.85)
-   * @returns Array de clusters
    */
   static clusterSymbols(
     symbols: ExtractedSymbol[],
@@ -114,7 +71,6 @@ export class SymbolClassifier {
 
     console.log(`[SymbolClassifier] Agrupando ${symbols.length} símbolos (threshold: ${threshold})...`);
 
-    // --- Fase 1: Greedy clustering inicial ---
     const clusters: SymbolCluster[] = [];
     const assigned = new Set<string>();
 
@@ -146,9 +102,6 @@ export class SymbolClassifier {
       clusters.push(cluster);
     }
 
-    // --- Fase 2: Lloyd's re-assignment (uma iteração) ---
-    // Cada símbolo é re-atribuído ao cluster mais próximo pelo centróide.
-    // Isso corrige erros causados por representantes greedy não representativos.
     const reassigned = clusters.map(c => ({
       ...c,
       members: [] as ExtractedSymbol[],
@@ -174,11 +127,10 @@ export class SymbolClassifier {
       reassigned[bestClusterIdx].count++;
     }
 
-    // Remover clusters vazios e atualizar centróides
-    const finalClusters = reassigned
-      .filter(c => c.count > 0)
-      .map((c, idx) => {
-        // Eleger novo representante: o membro mais próximo do centróide
+    const finalClusters: SymbolCluster[] = [];
+    for (let idx = 0; idx < reassigned.length; idx++) {
+      const c = reassigned[idx];
+      if (c.count > 0) {
         let bestMember = c.members[0];
         let bestDist = Infinity;
         for (const m of c.members) {
@@ -189,30 +141,20 @@ export class SymbolClassifier {
           }
         }
         const cluster: SymbolCluster = {
-          id: `cluster_${idx}`,
+          id: `cluster_${finalClusters.length}`,
           representativeSymbol: bestMember,
           members: c.members,
           avgFeatures: clusters[0].avgFeatures, // placeholder
           count: c.count
         };
         this.updateAverageFeatures(cluster);
-        return cluster;
-      });
-
-    console.log(`[SymbolClassifier] ✓ ${finalClusters.length} clusters (após Lloyd's re-assignment)`);
-
-    const sorted = [...finalClusters].sort((a, b) => b.count - a.count);
-    console.log('[SymbolClassifier] Top 5 clusters:');
-    for (let i = 0; i < Math.min(5, sorted.length); i++) {
-      console.log(`  ${sorted[i].id}: ${sorted[i].count} ocorrências`);
+        finalClusters.push(cluster);
+      }
     }
 
     return finalClusters;
   }
 
-  /**
-   * Atualiza características médias de um cluster
-   */
   private static updateAverageFeatures(cluster: SymbolCluster): void {
     const count = cluster.members.length;
 
@@ -231,10 +173,7 @@ export class SymbolClassifier {
       cluster.avgFeatures.perimeter += member.features.perimeter;
       cluster.avgFeatures.aspectRatio += member.features.aspectRatio;
 
-      if (
-        cluster.avgFeatures.extent !== undefined &&
-        member.features.extent !== undefined
-      ) {
+      if (cluster.avgFeatures.extent !== undefined && member.features.extent !== undefined) {
         cluster.avgFeatures.extent += member.features.extent;
       }
 
@@ -272,10 +211,6 @@ export class SymbolClassifier {
 
   /**
    * Identifica símbolos únicos a partir de clusters
-   *
-   * @param symbols - Array de símbolos extraídos
-   * @param threshold - Threshold de clustering (padrão: 0.85)
-   * @returns Array de símbolos únicos ordenados por frequência
    */
   static identifyUniqueSymbols(
     symbols: ExtractedSymbol[],
@@ -284,41 +219,14 @@ export class SymbolClassifier {
     const clusters = this.clusterSymbols(symbols, threshold);
 
     const uniqueSymbols: UniqueSymbol[] = clusters.map(cluster => ({
-      clusterId: cluster.id,
-      symbol: cluster.representativeSymbol,
+      symbolId: cluster.id,
+      representative: cluster.representativeSymbol,
       occurrences: cluster.members.flatMap(m => m.positions),
       mappedLetter: null
     }));
 
     uniqueSymbols.sort((a, b) => b.occurrences.length - a.occurrences.length);
-
-    console.log('[SymbolClassifier] Símbolos únicos identificados:');
-    uniqueSymbols.forEach((symbol, index) => {
-      console.log(`  ${index + 1}. ${symbol.clusterId}: ${symbol.occurrences.length} ocorrências`);
-    });
-
     return uniqueSymbols;
-  }
-
-  /**
-   * Calcula estatísticas de frequência dos símbolos
-   */
-  static calculateFrequencyStats(symbols: UniqueSymbol[]): {
-    total: number;
-    frequencies: Map<string, number>;
-    percentages: Map<string, number>;
-  } {
-    const total = symbols.reduce((sum, s) => sum + s.occurrences.length, 0);
-    const frequencies = new Map<string, number>();
-    const percentages = new Map<string, number>();
-
-    for (const symbol of symbols) {
-      const count = symbol.occurrences.length;
-      frequencies.set(symbol.clusterId, count);
-      percentages.set(symbol.clusterId, (count / total) * 100);
-    }
-
-    return { total, frequencies, percentages };
   }
 
   /**
@@ -333,11 +241,11 @@ export class SymbolClassifier {
     for (const uniqueSymbol of symbols) {
       for (const position of uniqueSymbol.occurrences) {
         allSymbols.push({
-          id: `${uniqueSymbol.clusterId}_${position.row}_${position.col}`,
-          imageData: uniqueSymbol.symbol.imageData,
-          features: uniqueSymbol.symbol.features,
+          id: `${uniqueSymbol.symbolId}_${position.row}_${position.col}`,
+          imageData: uniqueSymbol.representative.imageData,
+          features: uniqueSymbol.representative.features,
           positions: [position],
-          hash: uniqueSymbol.symbol.hash
+          hash: uniqueSymbol.representative.hash
         });
       }
     }
@@ -350,26 +258,26 @@ export class SymbolClassifier {
    */
   static mergeClusters(
     symbols: UniqueSymbol[],
-    clusterId1: string,
-    clusterId2: string
+    symbolId1: string,
+    symbolId2: string
   ): UniqueSymbol[] {
-    const cluster1 = symbols.find(s => s.clusterId === clusterId1);
-    const cluster2 = symbols.find(s => s.clusterId === clusterId2);
+    const cluster1 = symbols.find(s => s.symbolId === symbolId1);
+    const cluster2 = symbols.find(s => s.symbolId === symbolId2);
 
     if (!cluster1 || !cluster2) {
       throw new Error('Clusters não encontrados');
     }
 
     const mergedCluster: UniqueSymbol = {
-      clusterId: `${clusterId1}_merged`,
-      symbol: cluster1.symbol,
+      symbolId: `${symbolId1}_merged`,
+      representative: cluster1.representative,
       occurrences: [...cluster1.occurrences, ...cluster2.occurrences],
       mappedLetter: cluster1.mappedLetter || cluster2.mappedLetter
     };
 
     return [
       ...symbols.filter(
-        s => s.clusterId !== clusterId1 && s.clusterId !== clusterId2
+        s => s.symbolId !== symbolId1 && s.symbolId !== symbolId2
       ),
       mergedCluster
     ];
@@ -380,10 +288,10 @@ export class SymbolClassifier {
    */
   static splitCluster(
     symbols: UniqueSymbol[],
-    clusterId: string,
+    symbolId: string,
     subThreshold: number = 0.75
   ): UniqueSymbol[] {
-    const cluster = symbols.find(s => s.clusterId === clusterId);
+    const cluster = symbols.find(s => s.symbolId === symbolId);
 
     if (!cluster) {
       throw new Error('Cluster não encontrado');
@@ -396,25 +304,25 @@ export class SymbolClassifier {
 
     const individualSymbols: ExtractedSymbol[] = cluster.occurrences.map(
       (pos, i) => ({
-        id: `${clusterId}_${i}`,
-        imageData: cluster.symbol.imageData,
-        features: cluster.symbol.features,
+        id: `${symbolId}_${i}`,
+        imageData: cluster.representative.imageData,
+        features: cluster.representative.features,
         positions: [pos],
-        hash: cluster.symbol.hash
+        hash: cluster.representative.hash
       })
     );
 
     const newClusters = this.clusterSymbols(individualSymbols, subThreshold);
 
     const newUniqueSymbols: UniqueSymbol[] = newClusters.map((c, i) => ({
-      clusterId: `${clusterId}_split_${i}`,
-      symbol: c.representativeSymbol,
+      symbolId: `${symbolId}_split_${i}`,
+      representative: c.representativeSymbol,
       occurrences: c.members.flatMap(m => m.positions),
       mappedLetter: cluster.mappedLetter
     }));
 
     return [
-      ...symbols.filter(s => s.clusterId !== clusterId),
+      ...symbols.filter(s => s.symbolId !== symbolId),
       ...newUniqueSymbols
     ];
   }

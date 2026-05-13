@@ -131,7 +131,7 @@ export class TableDetector {
     const isHorizontal = Math.abs(lines[0].angle) < 45;
 
     // Ordenar pela posição central (não apenas p1)
-    const sorted = [...lines].sort((a, b) => {
+    const sorted = lines.toSorted((a, b) => {
       return this.lineCenterPos(a, isHorizontal) - this.lineCenterPos(b, isHorizontal);
     });
 

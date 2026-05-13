@@ -12,7 +12,7 @@ import type {
   BoundingBox,
   CellPosition,
   GridResult
-} from '../../types/image';
+} from '@/types';
 
 declare const cv: any;
 
@@ -375,7 +375,7 @@ export class SymbolExtractor {
       }
     }
 
-    const sorted = [...flatDct].sort((a, b) => a - b);
+    const sorted = flatDct.toSorted((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)];
 
     let hashHigh = 0;
@@ -469,27 +469,28 @@ export class SymbolExtractor {
     skipFirstColumn: boolean = true
   ): Promise<ExtractedSymbol[]> {
     const { GridDetector } = await import('./GridDetector');
-    const symbols: ExtractedSymbol[] = [];
     const startCol = skipFirstColumn ? 1 : 0;
+    const tasks: Promise<ExtractedSymbol | null>[] = [];
 
     for (let row = 0; row < grid.rows; row++) {
       for (let col = startCol; col < grid.cols; col++) {
-        try {
-          const cellImage = GridDetector.extractCell(preprocessedImage, row, col, grid);
-          const symbol = await this.extractSymbol(cellImage, { row, col });
-          if (symbol) symbols.push(symbol);
-        } catch (err: any) {
-          const msg = err?.message || String(err);
-          if (row === 0 && col === 1) {
-            // Logar detalhe apenas da primeira célula para não poluir
-            console.error(`[SymbolExtractor] erro detalhado (0,1): msg="${msg}" stack=${err?.stack || '(no stack)'}`);
+        tasks.push((async () => {
+          try {
+            const cellImage = GridDetector.extractCell(preprocessedImage, row, col, grid);
+            return await this.extractSymbol(cellImage, { row, col });
+          } catch (err: any) {
+            const msg = err?.message || String(err);
+            if (row === 0 && col === 1) {
+              console.error(`[SymbolExtractor] erro detalhado (0,1): msg="${msg}" stack=${err?.stack || '(no stack)'}`);
+            }
+            return null;
           }
-          // Continuar — não deixar uma célula ruim derrubar tudo
-        }
+        })());
       }
     }
 
-    return symbols;
+    const results = await Promise.all(tasks);
+    return results.filter((s: ExtractedSymbol | null): s is ExtractedSymbol => s !== null);
   }
 
   // ─── Caminho legado: TableDetector ───────────────────────────────────────
@@ -507,17 +508,23 @@ export class SymbolExtractor {
     skipFirstColumn: boolean = true
   ): Promise<ExtractedSymbol[]> {
     const { TableDetector } = await import('./TableDetector');
-    const symbols: ExtractedSymbol[] = [];
     const startCol = skipFirstColumn ? 1 : 0;
+    const tasks: Promise<ExtractedSymbol | null>[] = [];
 
     for (let row = 0; row < tableStructure.rows; row++) {
       for (let col = startCol; col < tableStructure.cols; col++) {
-        const cellImage = TableDetector.extractCell(preprocessedImage, row, col, tableStructure);
-        const symbol = await this.extractSymbol(cellImage, { row, col });
-        if (symbol) symbols.push(symbol);
+        tasks.push((async () => {
+          try {
+            const cellImage = TableDetector.extractCell(preprocessedImage, row, col, tableStructure);
+            return await this.extractSymbol(cellImage, { row, col });
+          } catch (err) {
+            return null;
+          }
+        })());
       }
     }
 
-    return symbols;
+    const results = await Promise.all(tasks);
+    return results.filter((s: ExtractedSymbol | null): s is ExtractedSymbol => s !== null);
   }
 }

@@ -1,7 +1,7 @@
 // src/hooks/useSymbolMapping.ts
 import { useState, useCallback, useMemo } from 'react';
 import type { UniqueSymbol, SymbolMapping } from '@/types'; // ✅ Removido SymbolSuggestion
-import { SymbolMapper, MappingValidator } from '@/lib/mapping/SymbolMapper';
+import { SymbolMapper, MappingValidator } from '@/lib/image-processing/SymbolMapper';
 
 export function useSymbolMapping(uniqueSymbols: UniqueSymbol[]) {
   const [mapping, setMapping] = useState<SymbolMapping>({});

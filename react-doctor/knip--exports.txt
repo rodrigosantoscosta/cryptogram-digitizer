@@ -1,0 +1,11 @@
+Rule: knip/exports
+Severity: warning
+Category: Dead Code
+Count: 6
+
+Unused export: usePuzzleSolver
+
+Files:
+  src\hooks\index.ts
+  src\hooks\usePuzzleSolver.ts
+  src\lib\image-processing\SymbolMapper.ts

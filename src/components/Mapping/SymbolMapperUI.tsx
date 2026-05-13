@@ -1,6 +1,6 @@
 // src/components/Mapping/SymbolMapperUI.tsx
 import { useState } from 'react';
-import type { UniqueSymbol, SymbolMapping, SymbolSuggestion } from '@types';
+import type { UniqueSymbol, SymbolMapping, SymbolSuggestion } from '@/types';
 
 interface SymbolMapperUIProps {
   uniqueSymbols: UniqueSymbol[];

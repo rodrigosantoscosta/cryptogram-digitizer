@@ -398,8 +398,8 @@ export class GridDetector {
       }
 
       // 5. Projetar em X e Y → posições de colunas e linhas
-      const rawColPos = this.clusterPeaks([...candidateX].sort((a, b) => a - b), INTERSECT_BUCKET_SIZE * 1.5);
-      const rawRowPos = this.clusterPeaks([...candidateY].sort((a, b) => a - b), INTERSECT_BUCKET_SIZE * 1.5);
+      const rawColPos = this.clusterPeaks(candidateX.toSorted((a, b) => a - b), INTERSECT_BUCKET_SIZE * 1.5);
+      const rawRowPos = this.clusterPeaks(candidateY.toSorted((a, b) => a - b), INTERSECT_BUCKET_SIZE * 1.5);
 
       const colPositions = this.regularizeByMedianGap(rawColPos);
       const rowPositions = this.regularizeByMedianGap(rawRowPos);
@@ -681,7 +681,7 @@ export class GridDetector {
       // Pode estar em qualquer posição, não apenas no início.
       let splitIdx = -1;
       {
-        const sortedSp  = [...vSpacings].sort((a, b) => a - b);
+        const sortedSp  = vSpacings.toSorted((a, b) => a - b);
         const medianSp  = sortedSp[Math.floor(sortedSp.length / 2)];
         const maxGap    = Math.max(...vSpacings);
         if (maxGap > medianSp * 2.0) {
@@ -760,7 +760,7 @@ export class GridDetector {
   /** Mediana de um array de números. */
   private static median(values: number[]): number {
     if (values.length === 0) return 0;
-    const sorted = [...values].sort((a, b) => a - b);
+    const sorted = values.toSorted((a, b) => a - b);
     const mid    = Math.floor(sorted.length / 2);
     return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   }
@@ -1260,7 +1260,7 @@ export class GridDetector {
     }
 
     // Remover duplicatas e ordenar
-    return [...new Set(positions)].sort((a, b) => a - b);
+    return [...new Set(positions)].toSorted((a, b) => a - b);
   }
 
   /**
@@ -1287,7 +1287,7 @@ export class GridDetector {
   private static regularizeByMedianGap(positions: number[]): number[] {
     if (positions.length < 2) return positions;
     const gaps = this.computeGaps(positions);
-    const sorted = [...gaps].sort((a, b) => a - b);
+    const sorted = gaps.toSorted((a, b) => a - b);
     const medianGap = sorted[Math.floor(sorted.length / 2)];
     if (medianGap <= 0) return positions;
 
@@ -1315,7 +1315,7 @@ export class GridDetector {
   private static validateUniformity(gaps: number[], label: string, tol?: number): void {
     if (gaps.length === 0) return;
     const effectiveTol = (tol ?? GRID_UNIFORMITY_TOL) * 2;
-    const sorted = [...gaps].sort((a, b) => a - b);
+    const sorted = gaps.toSorted((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)];
     for (const g of gaps) {
       if (Math.abs(g - median) / median > effectiveTol) {
@@ -1730,7 +1730,7 @@ export class GridDetector {
   private static regularizePositions(positions: number[], roiSize: number): number[] {
     if (positions.length === 0) return positions;
 
-    let sorted = [...positions].sort((a, b) => a - b);
+    let sorted = positions.toSorted((a, b) => a - b);
     sorted = this.clusterPeaks(sorted, PEAK_CLUSTER_RADIUS);
 
     const gaps = this.computeGaps(sorted);
@@ -1796,7 +1796,7 @@ export class GridDetector {
       };
     }
 
-    const sorted = [...values].sort((a, b) => a - b);
+    const sorted = values.toSorted((a, b) => a - b);
     let centroids = Array.from({ length: k }, (_, i) =>
       sorted[Math.floor((i / k) * sorted.length)]
     );

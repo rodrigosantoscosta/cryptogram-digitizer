@@ -17,6 +17,8 @@ import { SymbolClassifier } from '@/lib/image-processing/SymbolClassifier';
 import { OCREngine } from '@/lib/ocr/OCREngine';
 import { PSM } from 'tesseract.js';
 
+declare const cv: any;
+
 export function useImageProcessor() {
   const [status, setStatus] = useState<ProcessingStatus>({
     stage: 'idle',
@@ -212,8 +214,8 @@ function gridResultToTableStructure(grid: GridResult): TableStructure {
  * Converte TableStructure → GridResult para uso com o novo pipeline.
  */
 function tableStructureToGridResult(ts: TableStructure): GridResult {
-  const rowPositions = ts.gridPoints.map(row => row[0].y);
-  const colPositions = ts.gridPoints[0].map(pt => pt.x);
+  const rowPositions = ts.gridPoints.map((row: any) => row[0].y);
+  const colPositions = ts.gridPoints[0].map((pt: any) => pt.x);
 
   const colWidths: number[] = [];
   for (let c = 0; c < ts.cols; c++) {
@@ -247,6 +249,6 @@ function tableStructureToGridResult(ts: TableStructure): GridResult {
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = values.toSorted((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];
 }

@@ -1,0 +1,13 @@
+Rule: knip/types
+Severity: warning
+Category: Dead Code
+Count: 23
+
+Unused type: SymbolCluster
+
+Files:
+  src\types\image.ts
+  src\types\index.ts
+  src\types\puzzle.ts
+  src\types\symbol.ts
+  src\lib\image-processing\SymbolMapper.ts

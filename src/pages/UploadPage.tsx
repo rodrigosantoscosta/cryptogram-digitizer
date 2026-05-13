@@ -105,6 +105,15 @@ export function UploadPage() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          tabIndex={0}
+          role="button"
+          aria-label="Clique ou arraste uma imagem aqui para fazer upload"
         >
           <div style={styles.dropZoneContent}>
             <div style={styles.icon}>📁</div>

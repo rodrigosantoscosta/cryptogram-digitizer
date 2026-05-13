@@ -1,31 +1,7 @@
-export type { 
-  CellPosition, 
-  PuzzleMetadata, 
-  PuzzleState, 
-  PuzzleSolution, 
-  ValidationError, 
-  TableStructure 
-} from './puzzle';
+// src/types/index.ts
 
-export type { 
-  SymbolFeatures, 
-  ExtractedSymbol, 
-  SymbolCluster, 
-  UniqueSymbol, 
-  SymbolMapping, 
-  SymbolSuggestion 
-} from './symbol';
-
-export type { 
-  ClueResult, 
-  OCRConfig 
-} from './ocr';
-
-export type { 
-  GridCell 
-} from './grid';
-
-export type { 
-  ProcessedData, 
-  ProcessingStatus 
-} from './processed';
+export * from './image';
+export * from './symbol';
+export * from './grid';
+export * from './puzzle';
+export * from './ocr';

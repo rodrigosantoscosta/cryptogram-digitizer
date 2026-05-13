@@ -1,38 +1,59 @@
 // src/types/symbol.ts
-import type { CellPosition } from './puzzle';
+import type { Point } from './image';
+
+export interface CellPosition {
+  row: number;
+  col: number;
+}
 
 export interface SymbolFeatures {
   area: number;
+  perimeter: number;
   aspectRatio: number;
-  moments: number[]; // 7 Hu moments
+  moments: number[]; // Hu Moments (7 valores)
+  histogram: number[];
+  centerOfMass: Point;
+  extent?: number;
+  solidity?: number;
 }
 
+/**
+ * Símbolo extraído de uma célula
+ */
 export interface ExtractedSymbol {
-  id: string;                 // Hash estável (para deduplicação técnica)
-  imageData: ImageData;       // Recorte do símbolo
-  features: SymbolFeatures;   // Características para clustering
-  positions: CellPosition[];  // Onde aparece no grid
+  id: string;
+  imageData: ImageData;
+  features: SymbolFeatures;
+  positions: CellPosition[];
+  hash: string;
 }
 
+/**
+ * Cluster de símbolos similares (técnico)
+ */
 export interface SymbolCluster {
-  id: string;                 // cluster_0, cluster_1...
+  id: string;
   representativeSymbol: ExtractedSymbol;
   members: ExtractedSymbol[];
   avgFeatures: SymbolFeatures;
   count: number;
 }
 
+/**
+ * Símbolo único identificado (usado na UI)
+ */
 export interface UniqueSymbol {
-  symbolId: string;           // ID lógico usado na UI (ex.: "symbol_12")
+  symbolId: string;
   representative: ExtractedSymbol;
   occurrences: CellPosition[];
+  mappedLetter: string | null;
 }
 
-export type SymbolMapping = Record<string, string>; // "symbol_12" -> "A"
+export type SymbolMapping = Record<string, string>; // symbolId -> Letter
 
 export interface SymbolSuggestion {
   symbolId: string;
   suggestedLetter: string;
-  confidence: number; // 0..1
+  confidence: number;
   reason: string;
 }

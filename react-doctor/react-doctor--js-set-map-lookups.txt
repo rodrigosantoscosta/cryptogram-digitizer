@@ -1,0 +1,12 @@
+Rule: react-doctor/js-set-map-lookups
+Severity: warning
+Category: Performance
+Count: 2
+
+array.includes() in a loop is O(n) per call — convert to a Set for O(1) lookups
+
+Suggestion: Use a `Set` or `Map` for repeated membership tests / keyed lookups — `Array.includes`/`find` is O(n) per call
+
+Files:
+  game.js:162
+  criptoBuilder.js:91

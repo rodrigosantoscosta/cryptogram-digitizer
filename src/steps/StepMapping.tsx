@@ -1,13 +1,20 @@
+import { useState } from 'react';
 import { useSymbolMapping } from '../hooks/useSymbolMapping';
 import { SymbolMapperUI } from '../components/Mapping/SymbolMapperUI';
 import type { ProcessedData } from '../types/index';
+import type { SymbolMapping } from '../types/symbol';
 
 interface Props {
   processedData: ProcessedData;
   onRestart: () => void;
+  onSolve?: (mapping: SymbolMapping) => void;
 }
 
-export function StepMapping({ processedData, onRestart }: Props) {
+export function StepMapping({ processedData, onRestart, onSolve }: Props) {
+  const [
+    , // unused local mapping — we read from hook
+  ] = useState<SymbolMapping>({});
+
   const {
     mapping, suggestions, filteredSymbols,
     updateMapping, applyAutoMapping, progress, validation,
@@ -60,6 +67,14 @@ export function StepMapping({ processedData, onRestart }: Props) {
           />
 
           <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+            {onSolve && (
+              <button
+                style={s.solveBtn}
+                onClick={() => onSolve(mapping)}
+              >
+                🎮 Jogar Criptograma
+              </button>
+            )}
             <button style={s.exportBtn} onClick={handleExport}>
               💾 Exportar JSON
             </button>
@@ -94,6 +109,7 @@ const s: Record<string, React.CSSProperties> = {
   emptyState:   { textAlign: 'center', padding: '80px 20px' },
   emptyTitle:   { fontSize: 24, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
   emptyText:    { fontSize: 16, color: '#666', marginBottom: 24 },
+  solveBtn:     { padding: '12px 24px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
   exportBtn:    { padding: '12px 24px', backgroundColor: '#667eea', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
   restartBtn:   { padding: '12px 24px', backgroundColor: '#fff', color: '#667eea', border: '2px solid #667eea', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
 };

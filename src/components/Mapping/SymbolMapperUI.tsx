@@ -95,14 +95,14 @@ function SymbolMappingRow({
       <div className="symbol-preview">
         <canvas
           ref={(canvas) => {
-            if (canvas) {
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                canvas.width = symbol.representative.imageData.width;
-                canvas.height = symbol.representative.imageData.height;
-                ctx.putImageData(symbol.representative.imageData, 0, 0);
-              }
-            }
+            if (!canvas) return;
+            const imgData = symbol.representative?.imageData;
+            if (!(imgData instanceof ImageData)) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            canvas.width = imgData.width;
+            canvas.height = imgData.height;
+            ctx.putImageData(imgData, 0, 0);
           }}
         />
       </div>

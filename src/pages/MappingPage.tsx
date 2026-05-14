@@ -1,18 +1,26 @@
 // src/pages/MappingPage.tsx
-import { useState, useEffect} from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useSymbolMapping } from '@/hooks';
 import { SymbolMapperUI } from '@/components';
-import type { UniqueSymbol } from '@/types';
+import { usePuzzleStore } from '@/store/puzzleStore';
+import type { UniqueSymbol, ProcessedData, PuzzleState, GridCell } from '@/types';
 
 
 
 export function MappingPage() {
   const [uniqueSymbols, setUniqueSymbols] = useState<UniqueSymbol[]>([]);
+  const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
+
+  const setCurrentPuzzle = usePuzzleStore((s) => s.setCurrentPuzzle);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Recuperar símbolos do processamento
-    const stored = sessionStorage.getItem('processedSymbols');
+    // Tenta chave nova (v1) e chave legada como fallback
+    const stored =
+      sessionStorage.getItem('processedSymbols:v1') ||
+      sessionStorage.getItem('processedSymbols');
 
     if (stored) {
       try {
@@ -21,6 +29,16 @@ export function MappingPage() {
         console.log('Símbolos carregados:', symbols.length);
       } catch (error) {
         console.error('Erro ao carregar símbolos:', error);
+      }
+    }
+
+    // Tenta carregar processedData completo (salvo pelo ProcessingPage)
+    const storedData = sessionStorage.getItem('processedData');
+    if (storedData) {
+      try {
+        setProcessedData(JSON.parse(storedData));
+      } catch {
+        // silencioso — processedData é opcional para construir a grade
       }
     }
   }, []);
@@ -35,6 +53,100 @@ export function MappingPage() {
     validation,
   } = useSymbolMapping(uniqueSymbols);
 
+  /** Constrói a grade GridCell[][] a partir dos símbolos únicos */
+  function buildGrid(symbols: UniqueSymbol[]): GridCell[][] {
+    // Determina bounds da grade
+    let maxRow = 0;
+    let maxCol = 0;
+    for (const sym of symbols) {
+      for (const pos of sym.occurrences) {
+        if (pos.row > maxRow) maxRow = pos.row;
+        if (pos.col > maxCol) maxCol = pos.col;
+      }
+    }
+
+    const rows = maxRow + 1;
+    const cols = maxCol + 2; // +1 para coluna de pistas
+
+    // Grid vazio
+    const grid: GridCell[][] = Array.from({ length: rows }, (_, r) =>
+      Array.from({ length: cols }, (_, c) => ({
+        row: r,
+        col: c,
+        isClue: c === 0, // primeira coluna = pista
+        symbolId: undefined,
+        userValue: undefined,
+      }))
+    );
+
+    // Preenche posições dos símbolos (offset col +1 por causa da coluna de pistas)
+    for (const sym of symbols) {
+      for (const pos of sym.occurrences) {
+        const cell = grid[pos.row]?.[pos.col + 1];
+        if (cell) {
+          cell.symbolId = sym.symbolId;
+          cell.isClue = false;
+        }
+      }
+    }
+
+    return grid;
+  }
+
+  const handlePlay = () => {
+    if (!validation.isValid && validation.errors.length > 0) return;
+
+    const grid = buildGrid(uniqueSymbols);
+
+    const puzzle: PuzzleState = {
+      id: crypto.randomUUID(),
+      metadata: {
+        id: crypto.randomUUID(),
+        name: `Criptograma ${new Date().toLocaleDateString('pt-BR')}`,
+        createdAt: new Date(),
+        lastModified: new Date(),
+        progress: 0,
+      },
+      processedData: processedData ?? {
+        preprocessedImage: new ImageData(1, 1),
+        tableStructure: {
+          rows: grid.length,
+          cols: grid[0]?.length ?? 0,
+          cellWidth: 44,
+          cellHeight: 44,
+          gridPoints: [],
+          clueColumnWidth: 160,
+          answerColumnWidth: 44,
+        },
+        grid: {
+          roi: { x: 0, y: 0, width: 0, height: 0 },
+          rowPositions: [],
+          colPositions: [],
+          colWidths: [],
+          rowHeights: [],
+          rows: grid.length,
+          cols: grid[0]?.length ?? 0,
+        },
+        clues: [],
+        extractedSymbols: uniqueSymbols.map((s) => s.representative),
+        uniqueSymbols,
+        processedAt: new Date(),
+      },
+      mapping,
+      solution: {
+        grid,
+        mapping,
+        isComplete: false,
+        progress: 0,
+      },
+    };
+
+    setCurrentPuzzle(puzzle);
+    navigate('/puzzle');
+  };
+
+  const canPlay = uniqueSymbols.length > 0 && progress >= 50;
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>📋 Mapeamento de Símbolos</h1>
@@ -45,7 +157,7 @@ export function MappingPage() {
           <strong style={styles.progressValue}>{progress.toFixed(0)}%</strong>
         </div>
         <div style={styles.progressBar}>
-          <div 
+          <div
             style={{
               ...styles.progressFill,
               width: `${progress}%`,
@@ -63,15 +175,15 @@ export function MappingPage() {
           )}
 
           {validation.errors.length > 0 && (
-          <div style={styles.errorBanner}>
-            <strong>⚠️ Problemas encontrados:</strong>
-            <ul style={styles.errorList}>
-              {validation.errors.map((error: string) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+            <div style={styles.errorBanner}>
+              <strong>⚠️ Problemas encontrados:</strong>
+              <ul style={styles.errorList}>
+                {validation.errors.map((error: string) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <SymbolMapperUI
             uniqueSymbols={filteredSymbols}
@@ -80,6 +192,30 @@ export function MappingPage() {
             onMappingChange={updateMapping}
             onApplyAutoMapping={() => applyAutoMapping(0.7)}
           />
+
+          {/* ── Botão Jogar ── */}
+          <div style={styles.playSection}>
+            <button
+              style={{
+                ...styles.playButton,
+                ...(canPlay ? {} : styles.playButtonDisabled),
+              }}
+              onClick={handlePlay}
+              disabled={!canPlay}
+              title={
+                !canPlay
+                  ? 'Mapeie pelo menos 50% dos símbolos para jogar'
+                  : 'Iniciar o puzzle'
+              }
+            >
+              🎮 Jogar Criptograma →
+            </button>
+            {!canPlay && uniqueSymbols.length > 0 && (
+              <p style={styles.playHint}>
+                Mapeie pelo menos 50% dos símbolos ({Math.ceil(uniqueSymbols.length * 0.5)} de {uniqueSymbols.length}) para jogar
+              </p>
+            )}
+          </div>
         </>
       ) : (
         <div style={styles.emptyState}>
@@ -96,7 +232,6 @@ export function MappingPage() {
     </div>
   );
 }
-
 const styles: Record<string, React.CSSProperties> = {
   container: {
     maxWidth: '1200px',
@@ -191,5 +326,33 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: '600',
     transition: 'all 0.3s',
+  },
+  playSection: {
+    marginTop: '32px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '10px',
+  },
+  playButton: {
+    padding: '16px 40px',
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#fff',
+    backgroundColor: '#0079d3',
+    border: 'none',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    transition: 'background 0.2s, transform 0.1s',
+    letterSpacing: '-0.01em',
+  },
+  playButtonDisabled: {
+    backgroundColor: '#b0bec5',
+    cursor: 'not-allowed',
+  },
+  playHint: {
+    fontSize: '13px',
+    color: '#999',
+    margin: 0,
   },
 };

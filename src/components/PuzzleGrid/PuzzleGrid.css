@@ -1,0 +1,21 @@
+/* src/components/PuzzleGrid/PuzzleGrid.css */
+
+.puzzle-grid {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #c8c0b4;
+  border-left: 1px solid #c8c0b4;
+  align-self: flex-start;
+}
+
+.puzzle-grid__row {
+  display: flex;
+  flex-direction: row;
+}
+
+@media (prefers-color-scheme: dark) {
+  .puzzle-grid {
+    border-top-color: #3a3830;
+    border-left-color: #3a3830;
+  }
+}

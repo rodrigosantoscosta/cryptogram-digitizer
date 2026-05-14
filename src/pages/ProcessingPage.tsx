@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImageProcessor } from '@/hooks';
+import { usePuzzleStore } from '@/store/puzzleStore';
 import type { ProcessedData, UniqueSymbol, ExtractedSymbol } from '@/types';
 
 export function ProcessingPage() {
@@ -247,6 +248,25 @@ export function ProcessingPage() {
                 'processedSymbols:v1',
                 JSON.stringify(processedData.uniqueSymbols)
               );
+              // Salva os dados completos para o MappingPage montar o PuzzleState
+              // (ImageData não é serializável — omitimos preprocessedImage)
+              try {
+                const serializable = {
+                  ...processedData,
+                  preprocessedImage: null,
+                  extractedSymbols: processedData.extractedSymbols.map((s) => ({
+                    ...s,
+                    imageData: null,
+                  })),
+                  uniqueSymbols: processedData.uniqueSymbols.map((u) => ({
+                    ...u,
+                    representative: { ...u.representative, imageData: null },
+                  })),
+                };
+                sessionStorage.setItem('processedData', JSON.stringify(serializable));
+              } catch {
+                // silencioso — processedData é opcional
+              }
               navigate('/mapping');
             }}
           >

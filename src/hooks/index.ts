@@ -3,3 +3,4 @@
 export { useImageProcessor } from './useImageProcessor';
 export { useSymbolMapping } from './useSymbolMapping';
 export { usePuzzleSolver } from './usePuzzleSolver';
+export { usePuzzleNavigation } from './usePuzzleNavigation';

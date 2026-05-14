@@ -3,6 +3,7 @@ import { UploadPage } from './pages/UploadPage';
 import { ProcessingPage } from './pages/ProcessingPage';
 import { MappingPage } from './pages/MappingPage';
 import { TestPage } from './pages/TestPage';
+import { PuzzlePage } from './pages/PuzzlePage';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/mapping" element={<MappingPage />} />
           <Route path="/test" element={<TestPage />} />
+          <Route path="/puzzle" element={<PuzzlePage />} />
         </Routes>
       </div>
     </BrowserRouter>
@@ -63,6 +65,15 @@ function Navigation() {
             }}
           >
             📋 Mapeamento
+          </Link>
+          <Link 
+            to="/puzzle" 
+            style={{
+              ...styles.navLink,
+              ...(location.pathname === '/puzzle' ? styles.navLinkActive : {})
+            }}
+          >
+            🎮 Jogar
           </Link>
         </div>
       </div>

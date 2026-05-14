@@ -1,11 +1,14 @@
 // src/store/puzzleStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PuzzleState, PuzzleMetadata, SymbolMapping } from '@/types';
+import type { PuzzleState, PuzzleMetadata, ProcessedData, SymbolMapping } from '@/types';
 
 interface PuzzleStore {
   currentPuzzle: PuzzleState | null;
   savedPuzzles: PuzzleMetadata[];
+  /** Dados de processamento em trânsito ProcessingPage→MappingPage (contém ImageData, nunca persiste) */
+  pendingProcessedData: ProcessedData | null;
+  setPendingProcessedData: (data: ProcessedData | null) => void;
 
   setCurrentPuzzle: (puzzle: PuzzleState) => void;
   updateMapping: (mapping: SymbolMapping) => void;
@@ -14,6 +17,8 @@ interface PuzzleStore {
   loadPuzzle: (id: string) => Promise<void>;
   deletePuzzle: (id: string) => Promise<void>;
   clearCurrentPuzzle: () => void;
+  /** Alias semântico usado pelo PuzzlePage */
+  clearPuzzle: () => void;
 }
 
 export const usePuzzleStore = create<PuzzleStore>()(
@@ -21,6 +26,8 @@ export const usePuzzleStore = create<PuzzleStore>()(
     (set, get) => ({
       currentPuzzle: null,
       savedPuzzles: [],
+      pendingProcessedData: null,
+      setPendingProcessedData: (data) => set({ pendingProcessedData: data }),
 
       setCurrentPuzzle: (puzzle) => set({ currentPuzzle: puzzle }),
 
@@ -93,7 +100,10 @@ export const usePuzzleStore = create<PuzzleStore>()(
       },
 
       loadPuzzle: async (id) => {
-        console.log('Load puzzle:', id);
+        // Puzzles salvos contêm apenas metadata (sem ImageData, que não é serializável).
+        // Para carregar um puzzle completo com imagens, o fluxo Upload → Processing
+        // deve ser repetido. Esta função existe para uso futuro com IndexedDB.
+        console.warn('loadPuzzle: persistência completa de ImageData ainda não implementada. id=', id);
       },
 
       deletePuzzle: async (id) => {
@@ -103,6 +113,7 @@ export const usePuzzleStore = create<PuzzleStore>()(
       },
 
       clearCurrentPuzzle: () => set({ currentPuzzle: null }),
+      clearPuzzle: () => set({ currentPuzzle: null }),
     }),
     {
       name: 'puzzle-storage',

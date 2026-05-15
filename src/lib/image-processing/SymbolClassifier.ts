@@ -328,7 +328,7 @@ export class SymbolClassifier {
     ];
   }
 
-  // ─── Caminho numérico (criptogramas com números nas células) ─────────────
+  // ─── Caminho numérico (criptogramas com números nas células) ───────────
 
   /**
    * Constrói UniqueSymbol[] diretamente a partir do CellNumberMap.
@@ -341,7 +341,7 @@ export class SymbolClassifier {
    * O `representative` de cada UniqueSymbol é gerado com ImageData vazio (1×1)
    * porque a UI de mapeamento numérico usa o número diretamente — não a imagem.
    *
-   * @param cellNumbers  - Resultado do CellNumberReader
+   * @param cellNumbers      - Resultado do CellNumberReader
    * @param extractedSymbols - Símbolos visuais extraídos (usados como fonte de
    *   `representative.imageData` quando disponíveis, para exibição na UI)
    */
@@ -386,14 +386,16 @@ export class SymbolClassifier {
       return {
         symbolId: numStr,
         representative,
-        occurrences: positions.map(p => ({ row: p.row, col: p.col + 1 })), // +1: inclui offset da col de pistas
+        // As posições do CellNumberReader já são baseadas em col real (startCol=1).
+        // Não aplicar offset adicional para não deslocar o CellNumberOverlay.
+        occurrences: positions.map(p => ({ row: p.row, col: p.col })),
         mappedLetter: null,
       } satisfies UniqueSymbol;
     });
   }
 }
 
-// ─── Helpers privados do módulo ───────────────────────────────────────────────
+// ─── Helpers privados do módulo ─────────────────────────────────────────────────────
 
 function makeBlankFeatures(): import('@/types').SymbolFeatures {
   return {

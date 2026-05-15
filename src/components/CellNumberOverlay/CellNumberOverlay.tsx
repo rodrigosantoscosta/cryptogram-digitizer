@@ -7,10 +7,10 @@
  *
  * Funcionalidades:
  * - Grade colorida por confiança (verde ≥0.8 / amarelo ≥0.5 / vermelho <0.5 / cinza = null)
- * - Tooltip com rawText e confidence ao passar o mouse
+ * - Tooltip com rawOcr (Tesseract literal), rawText (pós-sanitização) e confidence
  * - Estatísticas de cobertura no cabeçalho
  * - Botão "Exportar diagnóstico" — gera JSON compacto para análise
- *   (células não reconhecidas, baixa confiança, bySymbol)
+ *   (células não reconhecidas, baixa confiança, bySymbol, rawOcr por célula)
  */
 
 import { useRef, useEffect, useState } from 'react';
@@ -49,6 +49,7 @@ function confidenceTextColor(cell: CellNumber): string {
  * - Só inclui células problemáticas (null ou confiança < LOW_CONF_THRESHOLD)
  * - bySymbol em formato compacto: "num": [[row,col],...]
  * - grade resumida: matriz rows×cols com o número lido (null = não lido)
+ * - Fix 4: rawOcr (saída literal do Tesseract) incluído nas células problemáticas
  */
 function buildDiagnosticExport(cellNumbers: CellNumberMap, grid: GridResult) {
   const LOW_CONF = 0.60;
@@ -67,10 +68,15 @@ function buildDiagnosticExport(cellNumbers: CellNumberMap, grid: GridResult) {
     }
   }
 
-  // Células não reconhecidas
+  // Células não reconhecidas — inclui rawOcr (literal Tesseract) e rawText (pós-sanitização)
   const unrecognized = cellNumbers.cells
     .filter(c => c.number === null)
-    .map(c => ({ r: c.row, c: c.col, raw: c.rawText || '' }));
+    .map(c => ({
+      r: c.row,
+      c: c.col,
+      rawOcr:  c.rawOcr  ?? '',   // saída literal do Tesseract antes de sanitizeDigits
+      rawText: c.rawText ?? '',   // após sanitizeDigits
+    }));
 
   // Células de baixa confiança (reconhecidas mas duvidosas)
   const lowConf = cellNumbers.cells
@@ -80,7 +86,8 @@ function buildDiagnosticExport(cellNumbers: CellNumberMap, grid: GridResult) {
       c: c.col,
       n: c.number,
       conf: Math.round(c.confidence * 100),
-      raw: c.rawText,
+      rawOcr:  c.rawOcr  ?? '',
+      rawText: c.rawText ?? '',
     }));
 
   // bySymbol compacto: {"1": [[0,1],[2,3]], ...}
@@ -209,7 +216,7 @@ export function CellNumberOverlay({ cellNumbers, grid, backgroundImage, onCellCl
                   onMouseLeave={() => setTooltip(null)}
                   onMouseMove={(e) => tooltip && setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
                   title={cell
-                    ? `(${row},${col}) → ${cell.number ?? '?'} | conf: ${(cell.confidence * 100).toFixed(0)}% | raw: "${cell.rawText}"`
+                    ? `(${row},${col}) → ${cell.number ?? '?'} | conf: ${(cell.confidence * 100).toFixed(0)}% | ocr: "${cell.rawOcr}" | sanitized: "${cell.rawText}"`
                     : `(${row},${col}) sem dado`}
                 >
                   <span style={s.cellNum}>{cell?.number ?? '–'}</span>
@@ -237,6 +244,10 @@ export function CellNumberOverlay({ cellNumbers, grid, backgroundImage, onCellCl
           </div>
           <div style={s.tooltipRow}>
             <span style={s.tooltipLabel}>Raw OCR</span>
+            <code style={s.tooltipCode}>"{tooltip.cell.rawOcr}"</code>
+          </div>
+          <div style={s.tooltipRow}>
+            <span style={s.tooltipLabel}>Sanitizado</span>
             <code style={s.tooltipCode}>"{tooltip.cell.rawText}"</code>
           </div>
         </div>
@@ -296,9 +307,9 @@ const s: Record<string, React.CSSProperties> = {
   cell:            { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: '1px solid rgba(0,0,0,0.08)', transition: 'filter 0.1s', userSelect: 'none' },
   cellNum:         { fontSize: 15, fontWeight: 700, lineHeight: 1 },
   cellConf:        { fontSize: 9, opacity: 0.75, marginTop: 1 },
-  tooltip:         { position: 'fixed', background: '#1f2937', color: '#f9fafb', borderRadius: 8, padding: '8px 12px', fontSize: 12, zIndex: 9999, pointerEvents: 'none', minWidth: 160, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' },
+  tooltip:         { position: 'fixed', background: '#1f2937', color: '#f9fafb', borderRadius: 8, padding: '8px 12px', fontSize: 12, zIndex: 9999, pointerEvents: 'none', minWidth: 180, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' },
   tooltipRow:      { display: 'flex', gap: 8, justifyContent: 'space-between', marginBottom: 3 },
-  tooltipLabel:    { color: '#9ca3af', minWidth: 65 },
+  tooltipLabel:    { color: '#9ca3af', minWidth: 75 },
   tooltipCode:     { background: '#374151', borderRadius: 3, padding: '0 4px', fontFamily: 'monospace', fontSize: 11 },
   details:         { marginTop: 16, border: '1px solid #e5e7eb', borderRadius: 8 },
   summary:         { padding: '10px 14px', cursor: 'pointer', fontWeight: 600, color: '#374151', fontSize: 13 },

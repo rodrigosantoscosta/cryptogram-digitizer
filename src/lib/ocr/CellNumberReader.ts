@@ -6,8 +6,7 @@
  *
  * Este módulo:
  *  1. Extrai cada célula numérica da grade usando extractCellInner()
- *  2. Pré-processa para OCR (upscale dinâmico, equalização de histograma
- *     via CLAHE para normalizar contraste independente da cor do fundo,
+ *  2. Pré-processa para OCR (upscale dinâmico, detecção HSV de fundo colorido,
  *     binarização adaptativa com detecção de polaridade)
  *  3. Reconhece o número via Tesseract (PSM.SINGLE_WORD, whitelist 0-9)
  *     com retry em cascata para células de baixa confiança
@@ -19,8 +18,9 @@
  *  - Números de 1 dígito (1-9):  97% de falha antes do fix
  *  - Causa: células destacadas (fundo colorido azul) faziam o
  *    adaptiveThreshold inverter o texto, tornando dígitos invisíveis
- *  - Fix: CLAHE normaliza o contraste antes da binarização,
- *    tornando o pipeline invariante à cor do fundo
+ *  - Fix 1: detecção HSV de saturação → threshold simples para células coloridas
+ *  - Fix 2: margem horizontal 4% / vertical 6% (preserva o '1' inicial)
+ *  - Fix 3: CLAHE removido (causava raw:"" em todas as 51 células null)
  *
  * Integração:
  *  - Chamado na Fase 3.5 do useImageProcessor
@@ -40,7 +40,8 @@ export interface CellNumber {
   col: number;
   number: number | null;   // null = célula vazia ou não reconhecida
   confidence: number;      // 0–1
-  rawText: string;
+  rawText: string;         // pós-sanitizeDigits
+  rawOcr: string;          // pré-sanitizeDigits (saída literal do Tesseract)
 }
 
 export interface CellNumberMap {
@@ -74,17 +75,19 @@ function sanitizeDigits(raw: string): string {
  * Pipeline:
  *  1. Grayscale
  *  2. Resize dinâmico para altura-alvo TARGET_H (INTER_CUBIC)
- *  3. CLAHE (Contrast Limited Adaptive Histogram Equalization)
- *     — normaliza contraste independente da cor do fundo
- *     — ESSENCIAL para células destacadas (fundo azul/colorido)
- *     — antes do fix: 97% de falha em números 1-9 (células coloridas)
- *  4. GaussianBlur leve (3×3, σ=0.5)
+ *  3. Detecção de fundo colorido via saturação HSV
+ *     — meanHSV[1] (canal S) > 40 → célula highlighted (fundo colorido)
+ *     — Fix 1: células coloridas usam threshold simples valor alto (180)
+ *       para isolar o dígito branco; células normais usam adaptiveThreshold
+ *  4. GaussianBlur leve (3×3, σ=0.5) — apenas para fundo branco normal
  *  5. Detecção de polaridade: luminosidade média do centro
- *     — após CLAHE o histograma está normalizado, luma > 128 = fundo claro
- *  6. adaptiveThreshold com blockSize proporcional (sempre ímpar, mínimo 11)
+ *     — luma > 128 = fundo claro → THRESH_BINARY_INV
+ *     — luma ≤ 128 = fundo escuro → THRESH_BINARY
+ *  6. adaptiveThreshold com blockSize proporcional (apenas fundo branco)
+ *     OU threshold simples 180 (fundo colorido)
  *  7. MORPH_CLOSE 2×2 para fechar gaps em traços finos
  *
- * @param cellImage     - ImageData da célula recortada
+ * @param cellImage      - ImageData da célula recortada
  * @param invertPolarity - força inversão de polaridade (para retry)
  */
 export function preprocessNumberCell(
@@ -95,7 +98,6 @@ export function preprocessNumberCell(
   const src     = cv.matFromImageData(cellImage);
   let gray      = new cv.Mat();
   let resized   = new cv.Mat();
-  let equalized = new cv.Mat();
   let blurred   = new cv.Mat();
   let binary    = new cv.Mat();
   let closed    = new cv.Mat();
@@ -115,46 +117,56 @@ export function preprocessNumberCell(
     const dsize = new cv.Size(gray.cols * scale, gray.rows * scale);
     cv.resize(gray, resized, dsize, 0, 0, cv.INTER_CUBIC);
 
-    // 3. CLAHE — normaliza contraste para qualquer cor de fundo
-    //    clipLimit=2.0, tileGridSize=8×8 (proporcional à célula upscalada)
-    //    Isso é o fix principal para células com fundo colorido:
-    //    após CLAHE o dígito branco em fundo azul fica tão legível
-    //    quanto dígito preto em fundo branco.
-    const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
-    clahe.apply(resized, equalized);
-    clahe.delete();
+    // 3. Detectar fundo colorido via saturação HSV (Fix 1)
+    //    Converte RGBA→RGB→HSV e mede a saturação média.
+    //    Se S > 40, a célula está highlighted (dígito branco em fundo colorido).
+    const rgbMat  = new cv.Mat();
+    const hsvMat  = new cv.Mat();
+    if (src.channels() === 4) {
+      cv.cvtColor(src, rgbMat, cv.COLOR_RGBA2RGB);
+    } else {
+      src.copyTo(rgbMat);
+    }
+    cv.cvtColor(rgbMat, hsvMat, cv.COLOR_RGB2HSV);
+    const meanHSV    = cv.mean(hsvMat);
+    const isHighlighted = meanHSV[1] > 40; // canal S > 40 = saturação de cor
+    rgbMat.delete();
+    hsvMat.delete();
 
-    // 4. GaussianBlur leve
-    cv.GaussianBlur(equalized, blurred, new cv.Size(3, 3), 0.5);
+    if (isHighlighted) {
+      // Fundo colorido → dígito é branco → threshold simples valor alto
+      // Não usa CLAHE nem adaptiveThreshold (ambos falham com fundo saturado)
+      cv.threshold(resized, binary, 180, 255, cv.THRESH_BINARY);
+    } else {
+      // Fundo branco normal → pipeline adaptativo original (sem CLAHE)
+      cv.GaussianBlur(resized, blurred, new cv.Size(3, 3), 0.5);
 
-    // 5. Detecção de polaridade via luminosidade média do centro
-    //    Após CLAHE, o histograma está normalizado:
-    //    luma > 128 → fundo claro → THRESH_BINARY_INV (texto fica branco)
-    //    luma ≤ 128 → fundo escuro → THRESH_BINARY (texto fica branco)
-    const cx  = Math.floor(blurred.cols / 4);
-    const cy  = Math.floor(blurred.rows / 4);
-    const cw  = Math.floor(blurred.cols / 2);
-    const ch  = Math.floor(blurred.rows / 2);
-    const roi = blurred.roi(new cv.Rect(cx, cy, cw, ch));
-    const mean = cv.mean(roi);
-    roi.delete();
-    const avgLuma    = mean[0];
-    const lightBg    = avgLuma > 128;
-    const useInv     = invertPolarity ? !lightBg : lightBg;
-    const threshType = useInv ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
+      // Detecção de polaridade via luminosidade média do centro
+      const cx  = Math.floor(blurred.cols / 4);
+      const cy  = Math.floor(blurred.rows / 4);
+      const cw  = Math.floor(blurred.cols / 2);
+      const ch  = Math.floor(blurred.rows / 2);
+      const roi = blurred.roi(new cv.Rect(cx, cy, cw, ch));
+      const mean = cv.mean(roi);
+      roi.delete();
+      const avgLuma    = mean[0];
+      const lightBg    = avgLuma > 128;
+      const useInv     = invertPolarity ? !lightBg : lightBg;
+      const threshType = useInv ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
 
-    // 6. adaptiveThreshold com blockSize proporcional (sempre ímpar, mínimo 11)
-    const blockSize = Math.max(11, Math.round(resized.rows / 8)) | 1;
-    cv.adaptiveThreshold(
-      blurred, binary,
-      255,
-      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-      threshType,
-      blockSize,
-      8
-    );
+      // adaptiveThreshold com blockSize proporcional (sempre ímpar, mínimo 11)
+      const blockSize = Math.max(11, Math.round(resized.rows / 8)) | 1;
+      cv.adaptiveThreshold(
+        blurred, binary,
+        255,
+        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+        threshType,
+        blockSize,
+        8
+      );
+    }
 
-    // 7. MORPH_CLOSE para fechar traços fragmentados
+    // MORPH_CLOSE para fechar traços fragmentados
     const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
     cv.morphologyEx(binary, closed, cv.MORPH_CLOSE, kernel);
     kernel.delete();
@@ -171,7 +183,6 @@ export function preprocessNumberCell(
     src.delete();
     gray.delete();
     resized.delete();
-    equalized.delete();
     blurred.delete();
     binary.delete();
     closed.delete();
@@ -182,7 +193,12 @@ export function preprocessNumberCell(
 
 /**
  * Extrai uma célula da grade aplicando margem interna proporcional ao tamanho
- * da célula (8% de min(w,h), mínimo 2px) para evitar bordas da grade.
+ * da célula.
+ *
+ * Fix 2: margem separada por eixo:
+ *  - marginX = 4% da largura (era 8% uniform → cortava o '1' inicial)
+ *  - marginY = 6% da altura  (ainda evita a borda horizontal da grade)
+ *  - mínimo 1px para células muito pequenas
  */
 function extractCellInner(
   image: ImageData,
@@ -192,12 +208,15 @@ function extractCellInner(
 ): ImageData | null {
   const rawW = Math.round(grid.colPositions[col + 1]) - Math.round(grid.colPositions[col]);
   const rawH = Math.round(grid.rowPositions[row + 1]) - Math.round(grid.rowPositions[row]);
-  const marginPx = Math.max(2, Math.round(Math.min(rawW, rawH) * 0.08));
 
-  const x0 = Math.round(grid.colPositions[col])     + marginPx;
-  const y0 = Math.round(grid.rowPositions[row])     + marginPx;
-  const x1 = Math.round(grid.colPositions[col + 1]) - marginPx;
-  const y1 = Math.round(grid.rowPositions[row + 1]) - marginPx;
+  // Fix 2: margens separadas horizontal/vertical
+  const marginX = Math.max(1, Math.round(rawW * 0.04));
+  const marginY = Math.max(1, Math.round(rawH * 0.06));
+
+  const x0 = Math.round(grid.colPositions[col])     + marginX;
+  const y0 = Math.round(grid.rowPositions[row])     + marginY;
+  const x1 = Math.round(grid.colPositions[col + 1]) - marginX;
+  const y1 = Math.round(grid.rowPositions[row + 1]) - marginY;
 
   const w = x1 - x0;
   const h = y1 - y0;
@@ -242,7 +261,7 @@ export class CellNumberReader {
   private async readCellWithPSM(
     processedCell: ImageData,
     psm: PSM
-  ): Promise<{ number: number | null; confidence: number; rawText: string }> {
+  ): Promise<{ number: number | null; confidence: number; rawText: string; rawOcr: string }> {
     if (!this.worker) throw new Error('CellNumberReader não inicializado');
 
     await this.worker.setParameters({ tessedit_pageseg_mode: psm });
@@ -253,28 +272,32 @@ export class CellNumberReader {
     canvas.getContext('2d')!.putImageData(processedCell, 0, 0);
 
     const { data } = await this.worker.recognize(canvas);
-    const rawText   = sanitizeDigits(data.text.replace(/\s+/g, '').trim());
+
+    // Fix 4: separar rawOcr (saída literal do Tesseract) de rawText (pós-sanitização)
+    const rawOcr    = data.text.replace(/\s+/g, '').trim();  // literal do Tesseract
+    const rawText   = sanitizeDigits(rawOcr);                 // após sanitização
     const confidence = (data.confidence ?? 0) / 100;
 
     const parsed = parseInt(rawText, 10);
     const number = isNaN(parsed) || parsed < 1 || parsed > 99 ? null : parsed;
 
-    return { number, confidence, rawText };
+    return { number, confidence, rawText, rawOcr };
   }
 
   /**
    * Retry em cascata — reutiliza o mesmo worker, só muda parâmetros.
    *
    * Tentativas:
-   *  1. PSM.SINGLE_WORD  + polaridade automática (após CLAHE)
+   *  1. PSM.SINGLE_WORD  + polaridade automática
    *  2. PSM.SINGLE_WORD  + polaridade invertida
    *  3. PSM.SPARSE_TEXT  + polaridade automática
    *
    * Aceita sem retry se confiança ≥ 0.60.
+   * Fix 4: rawOcr do melhor attempt é propagado junto com rawText.
    */
   private async readCellWithRetry(
     rawCell: ImageData
-  ): Promise<{ number: number | null; confidence: number; rawText: string }> {
+  ): Promise<{ number: number | null; confidence: number; rawText: string; rawOcr: string }> {
     const CONFIDENCE_THRESHOLD = 0.60;
 
     const attempts: Array<{ psm: PSM; invertPolarity: boolean }> = [
@@ -283,8 +306,8 @@ export class CellNumberReader {
       { psm: PSM.SPARSE_TEXT, invertPolarity: false },
     ];
 
-    let best: { number: number | null; confidence: number; rawText: string } = {
-      number: null, confidence: 0, rawText: ''
+    let best: { number: number | null; confidence: number; rawText: string; rawOcr: string } = {
+      number: null, confidence: 0, rawText: '', rawOcr: ''
     };
 
     for (const attempt of attempts) {
@@ -314,13 +337,13 @@ export class CellNumberReader {
 
     for (let row = 0; row < grid.rows; row++) {
       for (let col = startCol; col < grid.cols; col++) {
-        let result: CellNumber = { row, col, number: null, confidence: 0, rawText: '' };
+        let result: CellNumber = { row, col, number: null, confidence: 0, rawText: '', rawOcr: '' };
 
         try {
           const rawCell = extractCellInner(image, row, col, grid);
           if (rawCell) {
-            const { number, confidence, rawText } = await this.readCellWithRetry(rawCell);
-            result = { row, col, number, confidence, rawText };
+            const { number, confidence, rawText, rawOcr } = await this.readCellWithRetry(rawCell);
+            result = { row, col, number, confidence, rawText, rawOcr };
           }
         } catch (err) {
           console.warn(`[CellNumberReader] erro em (${row},${col}):`, err);

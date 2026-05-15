@@ -128,6 +128,7 @@ export function MappingPage() {
           cols: grid[0]?.length ?? 0,
         },
         clues: [],
+        cellNumbers: null,
         extractedSymbols: uniqueSymbols.map((s) => s.representative),
         uniqueSymbols,
         processedAt: new Date(),

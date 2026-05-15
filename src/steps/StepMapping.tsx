@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSymbolMapping } from '../hooks/useSymbolMapping';
 import { SymbolMapperUI } from '../components/Mapping/SymbolMapperUI';
+import { CellNumberOverlay } from '../components/CellNumberOverlay';
 import type { ProcessedData } from '../types/index';
 import type { SymbolMapping } from '../types/symbol';
 
@@ -11,14 +12,18 @@ interface Props {
 }
 
 export function StepMapping({ processedData, onRestart, onSolve }: Props) {
-  const [
-    , // unused local mapping — we read from hook
-  ] = useState<SymbolMapping>({});
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const {
     mapping, suggestions, filteredSymbols,
     updateMapping, applyAutoMapping, progress, validation,
   } = useSymbolMapping(processedData.uniqueSymbols);
+
+  const { cellNumbers, grid } = processedData;
+  const hasNumbers = cellNumbers !== null && cellNumbers.total > 0;
+  const coverage = hasNumbers
+    ? Math.round((cellNumbers.recognized / cellNumbers.total) * 100)
+    : 0;
 
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(mapping, null, 2)], { type: 'application/json' });
@@ -34,6 +39,7 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
     <div style={s.container}>
       <h1 style={s.title}>Mapeamento de Símbolos</h1>
 
+      {/* Barra de progresso */}
       <div style={s.progressCard}>
         <div style={s.progressHeader}>
           <span>Progresso do mapeamento</span>
@@ -43,6 +49,42 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
           <div style={{ ...s.progressFill, width: `${progress}%` }} />
         </div>
       </div>
+
+      {/* Banner de detecção numérica */}
+      {hasNumbers && (
+        <div style={{ ...s.infoBanner, ...(coverage >= 70 ? s.infoBannerGood : s.infoBannerWarn) }}>
+          <div style={s.infoBannerLeft}>
+            <span style={s.infoBannerIcon}>{coverage >= 70 ? '🔢' : '⚠️'}</span>
+            <div>
+              <strong>
+                {coverage >= 70
+                  ? `Números detectados — modo numérico ativo (${coverage}% de cobertura)`
+                  : `Detecção parcial de números (${coverage}% de cobertura) — usando pHash visual`}
+              </strong>
+              <p style={s.infoBannerSub}>
+                {cellNumbers.recognized} de {cellNumbers.total} células reconhecidas
+                · {Object.keys(cellNumbers.bySymbol).length} símbolos únicos
+              </p>
+            </div>
+          </div>
+          <button
+            style={s.diagBtn}
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+          >
+            {showDiagnostics ? 'Ocultar diagnóstico' : 'Ver diagnóstico'}
+          </button>
+        </div>
+      )}
+
+      {/* Painel de diagnóstico */}
+      {showDiagnostics && hasNumbers && (
+        <div style={s.diagPanel}>
+          <CellNumberOverlay
+            cellNumbers={cellNumbers}
+            grid={grid}
+          />
+        </div>
+      )}
 
       {processedData.uniqueSymbols.length > 0 ? (
         <>
@@ -66,7 +108,7 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
             onApplyAutoMapping={() => applyAutoMapping(0.7)}
           />
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
             {onSolve && (
               <button
                 style={s.solveBtn}
@@ -96,20 +138,34 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container:    { maxWidth: 1200, margin: '0 auto' },
-  title:        { fontSize: 32, fontWeight: 'bold', marginBottom: 24, color: '#1a1a1a' },
-  progressCard: { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: 12, padding: 20, marginBottom: 24 },
+  container:      { maxWidth: 1200, margin: '0 auto' },
+  title:          { fontSize: 32, fontWeight: 'bold', marginBottom: 24, color: '#1a1a1a' },
+
+  progressCard:   { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: 12, padding: 20, marginBottom: 16 },
   progressHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, fontSize: 14, color: '#666' },
   progressValue:  { fontSize: 20, color: '#667eea' },
-  progressBar:  { width: '100%', height: 8, backgroundColor: '#e0e0e0', borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#667eea', transition: 'width 0.3s ease' },
-  successBanner: { backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: 8, padding: 16, marginBottom: 24, color: '#155724', fontSize: 16, fontWeight: 500 },
-  errorBanner:  { backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: 8, padding: 16, marginBottom: 24, color: '#721c24' },
-  errorList:    { margin: '8px 0 0 0', paddingLeft: 20 },
-  emptyState:   { textAlign: 'center', padding: '80px 20px' },
-  emptyTitle:   { fontSize: 24, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
-  emptyText:    { fontSize: 16, color: '#666', marginBottom: 24 },
-  solveBtn:     { padding: '12px 24px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  exportBtn:    { padding: '12px 24px', backgroundColor: '#667eea', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  restartBtn:   { padding: '12px 24px', backgroundColor: '#fff', color: '#667eea', border: '2px solid #667eea', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
+  progressBar:    { width: '100%', height: 8, backgroundColor: '#e0e0e0', borderRadius: 4, overflow: 'hidden' },
+  progressFill:   { height: '100%', backgroundColor: '#667eea', transition: 'width 0.3s ease' },
+
+  infoBanner:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, borderRadius: 10, padding: '14px 18px', marginBottom: 16, flexWrap: 'wrap' },
+  infoBannerGood: { background: '#f0fdf4', border: '1px solid #86efac' },
+  infoBannerWarn: { background: '#fffbeb', border: '1px solid #fde68a' },
+  infoBannerLeft: { display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1 },
+  infoBannerIcon: { fontSize: 22, lineHeight: 1, marginTop: 2 },
+  infoBannerSub:  { fontSize: 12, color: '#6b7280', marginTop: 3, marginBottom: 0 },
+  diagBtn:        { padding: '6px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 },
+
+  diagPanel:      { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 20 },
+
+  successBanner:  { backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: 8, padding: 16, marginBottom: 24, color: '#155724', fontSize: 16, fontWeight: 500 },
+  errorBanner:    { backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: 8, padding: 16, marginBottom: 24, color: '#721c24' },
+  errorList:      { margin: '8px 0 0 0', paddingLeft: 20 },
+
+  emptyState:     { textAlign: 'center', padding: '80px 20px' },
+  emptyTitle:     { fontSize: 24, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
+  emptyText:      { fontSize: 16, color: '#666', marginBottom: 24 },
+
+  solveBtn:       { padding: '12px 24px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
+  exportBtn:      { padding: '12px 24px', backgroundColor: '#667eea', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
+  restartBtn:     { padding: '12px 24px', backgroundColor: '#fff', color: '#667eea', border: '2px solid #667eea', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
 };

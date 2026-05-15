@@ -64,6 +64,7 @@ export function makeProcessedData(uniqueSymbols: UniqueSymbol[] = []): Processed
       { row: 0, text: 'Primeira pista', confidence: 0.95, rawText: 'Primeira pista' },
       { row: 1, text: 'Segunda pista', confidence: 0.90, rawText: 'Segunda pista' },
     ],
+    cellNumbers: null,
     extractedSymbols: uniqueSymbols.map((u) => u.representative),
     uniqueSymbols,
     processedAt: new Date('2026-05-14T00:00:00Z'),

@@ -140,7 +140,7 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
           {Object.entries(mapping).map(([symbolId, letter]) =>
             letter ? (
               <span key={symbolId} style={s.chip}>
-                <span style={s.chipId}>{symbolId.replace('symbol_', '#').replace('symbol-', '#')}</span>
+                <span style={s.chipId}>{/^\d+$/.test(symbolId) ? `#${symbolId}` : symbolId.replace(/^cluster_/, '#').replace(/^symbol[-_]/, '#')}</span>
                 <span style={s.chipArrow}>→</span>
                 <span style={s.chipLetter}>{letter}</span>
               </span>

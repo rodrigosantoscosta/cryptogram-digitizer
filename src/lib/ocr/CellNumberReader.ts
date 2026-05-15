@@ -5,13 +5,16 @@
  * contém um número inteiro (1–27) que funciona como identificador de símbolo.
  *
  * Este módulo:
- *  1. Extrai cada célula numérica da grade usando GridDetector.extractCell()
- *  2. Pré-processa para OCR (upscale, binarização adaptativa, inversão se necessário)
- *  3. Reconhece o número via Tesseract (PSM.SINGLE_CHAR, whitelist 0-9)
- *  4. Retorna CellNumberMap: mapeamento (row, col) → número lido
+ *  1. Extrai cada célula numérica da grade usando extractCellInner()
+ *  2. Pré-processa para OCR (upscale dinâmico, binarização adaptativa com
+ *     detecção de polaridade, inversão automática conforme fundo)
+ *  3. Reconhece o número via Tesseract (PSM.SINGLE_WORD, whitelist 0-9)
+ *     com retry em cascata para células de baixa confiança
+ *  4. Sanitiza o texto lido corrigindo confusões clássicas (I→1, O→0, etc.)
+ *  5. Retorna CellNumberMap: mapeamento (row, col) → número lido
  *
  * Integração:
- *  - Chamado na Fase 3 do useImageProcessor, logo após detecção da grade
+ *  - Chamado na Fase 3.5 do useImageProcessor, logo após detecção da grade
  *  - Substitui / complementa o SymbolExtractor para criptogramas numéricos
  *  - O resultado alimenta SymbolClassifier via symbolId = número (string "1".."27")
  */
@@ -41,6 +44,23 @@ export interface CellNumberMap {
   total: number;
 }
 
+// ─── Sanitização de dígitos ───────────────────────────────────────────────────
+
+/**
+ * Corrige confusões clássicas do Tesseract entre letras e dígitos.
+ * Aplicado após cada leitura para maximizar o parse correto.
+ */
+function sanitizeDigits(raw: string): string {
+  return raw
+    .replace(/[oO]/g, '0')
+    .replace(/[iIlL|]/g, '1')
+    .replace(/[zZ]/g, '2')
+    .replace(/[sS]/g, '5')
+    .replace(/[bB]/g, '6')
+    .replace(/[gGqQ]/g, '9')
+    .replace(/[^0-9]/g, '');
+}
+
 // ─── Pré-processamento de célula numérica ─────────────────────────────────────
 
 /**
@@ -48,20 +68,29 @@ export interface CellNumberMap {
  *
  * Pipeline:
  *  1. Grayscale
- *  2. Resize 4× (INTER_CUBIC) — dígitos pequenos exigem upscale agressivo
+ *  2. Resize dinâmico para altura-alvo TARGET_H (INTER_CUBIC)
+ *     — garante mínimo de 96px independente da resolução original
  *  3. GaussianBlur leve (3×3, σ=0.5) para suavizar artefatos JPEG
- *  4. adaptiveThreshold (THRESH_BINARY_INV, blockSize=15, C=8)
- *     — inverte para fundo preto / texto branco (Tesseract aceita ambos,
- *       mas branco-sobre-preto costuma ser mais robusto para dígitos)
- *  5. MORPH_CLOSE 2×2 — fecha gaps em traços finos
+ *  4. Detecção de polaridade: calcula luminosidade média do centro da célula
+ *     — fundo claro (luma > 128) → THRESH_BINARY_INV (texto fica branco)
+ *     — fundo escuro (luma ≤ 128) → THRESH_BINARY (texto fica branco)
+ *  5. adaptiveThreshold com blockSize proporcional ao upscale (sempre ímpar)
+ *  6. MORPH_CLOSE 2×2 — fecha gaps em traços finos
+ *
+ * @param cellImage - ImageData da célula recortada
+ * @param invertPolarity - força inversão de polaridade (para retry)
  */
-export function preprocessNumberCell(cellImage: ImageData): ImageData {
+export function preprocessNumberCell(
+  cellImage: ImageData,
+  invertPolarity = false
+): ImageData {
+  const TARGET_H = 96;
   const src = cv.matFromImageData(cellImage);
-  let gray = new cv.Mat();
+  let gray    = new cv.Mat();
   let resized = new cv.Mat();
   let blurred = new cv.Mat();
-  let binary = new cv.Mat();
-  let closed = new cv.Mat();
+  let binary  = new cv.Mat();
+  let closed  = new cv.Mat();
 
   try {
     // 1. Grayscale
@@ -73,29 +102,46 @@ export function preprocessNumberCell(cellImage: ImageData): ImageData {
       src.copyTo(gray);
     }
 
-    // 2. Upscale 4×
-    const dsize = new cv.Size(gray.cols * 4, gray.rows * 4);
+    // 2. Upscale dinâmico
+    const scale  = Math.max(2, Math.ceil(TARGET_H / Math.max(gray.rows, 1)));
+    const dsize  = new cv.Size(gray.cols * scale, gray.rows * scale);
     cv.resize(gray, resized, dsize, 0, 0, cv.INTER_CUBIC);
 
     // 3. GaussianBlur leve
     cv.GaussianBlur(resized, blurred, new cv.Size(3, 3), 0.5);
 
-    // 4. adaptiveThreshold — fundo preto, texto branco
+    // 4. Detecção de polaridade via luminosidade média do centro
+    //    Amostra uma ROI de 50% do centro para evitar bordas
+    const cx   = Math.floor(blurred.cols / 4);
+    const cy   = Math.floor(blurred.rows / 4);
+    const cw   = Math.floor(blurred.cols / 2);
+    const ch   = Math.floor(blurred.rows / 2);
+    const roi  = blurred.roi(new cv.Rect(cx, cy, cw, ch));
+    const mean = cv.mean(roi);
+    roi.delete();
+    const avgLuma    = mean[0];
+    const lightBg    = avgLuma > 128;
+    const useInv     = invertPolarity ? !lightBg : lightBg;
+    const threshType = useInv ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
+
+    // 5. adaptiveThreshold com blockSize proporcional (sempre ímpar, mín 11)
+    const blockSize = Math.max(11, Math.round(resized.rows / 8)) | 1;
     cv.adaptiveThreshold(
       blurred, binary,
       255,
       cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-      cv.THRESH_BINARY_INV,
-      15, 8
+      threshType,
+      blockSize,
+      8
     );
 
-    // 5. MORPH_CLOSE para fechar traços fragmentados
+    // 6. MORPH_CLOSE para fechar traços fragmentados
     const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
     cv.morphologyEx(binary, closed, cv.MORPH_CLOSE, kernel);
     kernel.delete();
 
     const canvas = document.createElement('canvas');
-    canvas.width = closed.cols;
+    canvas.width  = closed.cols;
     canvas.height = closed.rows;
     canvas.getContext('2d')!.fillStyle = '#000';
     canvas.getContext('2d')!.fillRect(0, 0, canvas.width, canvas.height);
@@ -115,16 +161,20 @@ export function preprocessNumberCell(cellImage: ImageData): ImageData {
 // ─── Extração de célula com margem interna ────────────────────────────────────
 
 /**
- * Extrai uma célula da grade aplicando margem interna para evitar bordas.
+ * Extrai uma célula da grade aplicando margem interna proporcional ao tamanho
+ * da célula (8% de min(w,h), mínimo 2px) para evitar bordas da grade.
  * Retorna ImageData ou null se fora dos limites.
  */
 function extractCellInner(
   image: ImageData,
   row: number,
   col: number,
-  grid: GridResult,
-  marginPx: number = 3
+  grid: GridResult
 ): ImageData | null {
+  const rawW = Math.round(grid.colPositions[col + 1]) - Math.round(grid.colPositions[col]);
+  const rawH = Math.round(grid.rowPositions[row + 1]) - Math.round(grid.rowPositions[row]);
+  const marginPx = Math.max(2, Math.round(Math.min(rawW, rawH) * 0.08));
+
   const x0 = Math.round(grid.colPositions[col])     + marginPx;
   const y0 = Math.round(grid.rowPositions[row])     + marginPx;
   const x1 = Math.round(grid.colPositions[col + 1]) - marginPx;
@@ -137,13 +187,12 @@ function extractCellInner(
   if (x0 < 0 || y0 < 0 || x1 > image.width || y1 > image.height) return null;
 
   const canvas = document.createElement('canvas');
-  canvas.width = w;
+  canvas.width  = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
 
-  // Desenhar a fatia da imagem original na posição (x0, y0)
   const tmp = document.createElement('canvas');
-  tmp.width = image.width;
+  tmp.width  = image.width;
   tmp.height = image.height;
   tmp.getContext('2d')!.putImageData(image, 0, 0);
   ctx.drawImage(tmp, x0, y0, w, h, 0, 0, w, h);
@@ -160,12 +209,15 @@ export class CellNumberReader {
    * Inicializa o worker Tesseract configurado para dígitos.
    * Reutilizar a mesma instância para todas as células é ~10× mais rápido
    * do que criar um worker por célula.
+   *
+   * PSM.SINGLE_WORD aceita 1–N caracteres, essencial para números de 2 dígitos
+   * (10–27). PSM.SINGLE_CHAR era o bug principal que impedia reconhecimento
+   * de qualquer número ≥ 10.
    */
   async initialize(): Promise<void> {
-    // 'eng' é suficiente para dígitos (0-9); 'por' não adiciona nada
     this.worker = await createWorker('eng');
     await this.worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_CHAR,
+      tessedit_pageseg_mode: PSM.SINGLE_WORD,
       tessedit_char_whitelist: '0123456789',
     });
   }
@@ -178,19 +230,23 @@ export class CellNumberReader {
   }
 
   /**
-   * Lê um número de uma única célula pré-processada.
-   * Retorna { number, confidence, rawText }.
+   * Lê um número de uma única célula pré-processada com PSM específico.
    */
-  private async readCell(processedCell: ImageData): Promise<{ number: number | null; confidence: number; rawText: string }> {
+  private async readCellWithPSM(
+    processedCell: ImageData,
+    psm: PSM
+  ): Promise<{ number: number | null; confidence: number; rawText: string }> {
     if (!this.worker) throw new Error('CellNumberReader não inicializado');
 
+    await this.worker.setParameters({ tessedit_pageseg_mode: psm });
+
     const canvas = document.createElement('canvas');
-    canvas.width = processedCell.width;
+    canvas.width  = processedCell.width;
     canvas.height = processedCell.height;
     canvas.getContext('2d')!.putImageData(processedCell, 0, 0);
 
     const { data } = await this.worker.recognize(canvas);
-    const rawText = data.text.replace(/\s+/g, '').trim();
+    const rawText  = sanitizeDigits(data.text.replace(/\s+/g, '').trim());
     const confidence = (data.confidence ?? 0) / 100;
 
     const parsed = parseInt(rawText, 10);
@@ -200,10 +256,56 @@ export class CellNumberReader {
   }
 
   /**
+   * Lê um número de uma célula usando pipeline de retry em cascata.
+   *
+   * Tentativas (reutiliza o mesmo worker, apenas muda parâmetros):
+   *  1. PSM.SINGLE_WORD  + polaridade automática
+   *  2. PSM.SINGLE_WORD  + polaridade invertida (fundo colorido / escuro)
+   *  3. PSM.SPARSE_TEXT  + polaridade automática (mais tolerante a layout)
+   *
+   * Retorna o resultado com maior confidence entre as tentativas bem-sucedidas.
+   * Threshold mínimo de confiança para aceitar sem retry: 0.60.
+   */
+  private async readCellWithRetry(
+    rawCell: ImageData
+  ): Promise<{ number: number | null; confidence: number; rawText: string }> {
+    const CONFIDENCE_THRESHOLD = 0.60;
+
+    const attempts: Array<{ psm: PSM; invertPolarity: boolean }> = [
+      { psm: PSM.SINGLE_WORD,  invertPolarity: false },
+      { psm: PSM.SINGLE_WORD,  invertPolarity: true  },
+      { psm: PSM.SPARSE_TEXT,  invertPolarity: false },
+    ];
+
+    let best: { number: number | null; confidence: number; rawText: string } = {
+      number: null, confidence: 0, rawText: ''
+    };
+
+    for (const attempt of attempts) {
+      const processed = preprocessNumberCell(rawCell, attempt.invertPolarity);
+      const result    = await this.readCellWithPSM(processed, attempt.psm);
+
+      if (result.number !== null && result.confidence > best.confidence) {
+        best = result;
+      }
+
+      // Aceitar sem continuar se confiança já é boa
+      if (best.confidence >= CONFIDENCE_THRESHOLD && best.number !== null) {
+        break;
+      }
+    }
+
+    // Restaurar PSM padrão para próxima célula
+    await this.worker!.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_WORD });
+
+    return best;
+  }
+
+  /**
    * Processa todas as células numéricas da grade (colunas 1..N-1).
    *
-   * @param image  - Imagem original (RGBA) usada para recorte
-   * @param grid   - GridResult da detecção de grade
+   * @param image      - Imagem original (RGBA) usada para recorte
+   * @param grid       - GridResult da detecção de grade
    * @param onProgress - Callback de progresso opcional (0–1)
    */
   async readAllCells(
@@ -213,7 +315,7 @@ export class CellNumberReader {
   ): Promise<CellNumberMap> {
     const cells: CellNumber[] = [];
     const startCol = 1; // pular coluna de pistas
-    const total = grid.rows * (grid.cols - startCol);
+    const total    = grid.rows * (grid.cols - startCol);
     let done = 0;
 
     for (let row = 0; row < grid.rows; row++) {
@@ -221,11 +323,10 @@ export class CellNumberReader {
         let result: CellNumber = { row, col, number: null, confidence: 0, rawText: '' };
 
         try {
-          const rawCell = extractCellInner(image, row, col, grid, 3);
+          const rawCell = extractCellInner(image, row, col, grid);
 
           if (rawCell) {
-            const processed = preprocessNumberCell(rawCell);
-            const { number, confidence, rawText } = await this.readCell(processed);
+            const { number, confidence, rawText } = await this.readCellWithRetry(rawCell);
             result = { row, col, number, confidence, rawText };
           }
         } catch (err) {

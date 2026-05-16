@@ -11,9 +11,6 @@ dev-server.log
 # Playwright CLI
 /.playwright-cli/
 
-# Serena
-/.serena/
-
 # Ambiente
 .env
 .env.local

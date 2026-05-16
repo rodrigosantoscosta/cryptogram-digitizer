@@ -1,0 +1,24 @@
+{
+  "name": "cryptogram-backend",
+  "version": "1.0.0",
+  "description": "API Gateway for Cryptogram Digitizer OCR Service",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/multipart": "^8.1.0",
+    "fastify": "^4.26.0",
+    "form-data": "^4.0.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  }
+}

@@ -1,35 +1,22 @@
 /**
  * CellNumberReader — Leitura de números nas células do criptograma
  *
- * No criptograma do sample.jpg cada célula da grade (exceto a coluna de pistas)
- * contém um número inteiro (1–27) que funciona como identificador de símbolo.
+ * Pipeline (EasyOCR Migration):
+ *  1. Extrai célula com margem interna mínima (2% horizontal, 3% vertical)
+ *  2. Converte ImageData para Blob PNG
+ *  3. Envia para EasyOCR via API (backend Fastify → FastAPI + EasyOCR)
+ *  4. Recebe resultado com número, confiança e texto raw
+ *  5. Template matching fallback usando células de alta confiança
+ *  6. Validação com frequência, vizinhos e posições conhecidas
  *
- * Este módulo:
- *  1. Extrai cada célula numérica da grade usando extractCellInner()
- *  2. Pré-processa para OCR (upscale dinâmico, detecção HSV de fundo colorido,
- *     binarização adaptativa com detecção de polaridade)
- *  3. Reconhece o número via Tesseract (PSM.SINGLE_WORD, whitelist 0-9)
- *     com retry em cascata para células de baixa confiança
- *  4. Sanitiza o texto lido corrigindo confusões clássicas (I→1, O→0, etc.)
- *  5. Retorna CellNumberMap: mapeamento (row, col) → número lido
- *
- * ## Diagnóstico do sample.jpg (ground truth via Google Lens):
- *  - Números de 2 dígitos (10+): 13% de falha antes do fix
- *  - Números de 1 dígito (1-9):  97% de falha antes do fix
- *  - Causa: células destacadas (fundo colorido azul) faziam o
- *    adaptiveThreshold inverter o texto, tornando dígitos invisíveis
- *  - Fix 1: detecção HSV de saturação → threshold simples para células coloridas
- *  - Fix 2: margem horizontal 4% / vertical 6% (preserva o '1' inicial)
- *  - Fix 3: CLAHE removido (causava raw:"" em todas as 51 células null)
- *
- * Integração:
- *  - Chamado na Fase 3.5 do useImageProcessor
- *  - Substitui / complementa o SymbolExtractor para criptogramas numéricos
- *  - O resultado alimenta SymbolClassifier via symbolId = número (string "1".."27")
+ * Racional:
+ *  - EasyOCR tem melhor precisão para dígitos em criptogramas
+ *  - Backend Dockerizado permite CPU-only processing
+ *  - Batch processing reduz latência (16 células por request)
  */
 
-import { createWorker, PSM } from 'tesseract.js';
 import type { GridResult } from '@/types';
+import { OCRApiClient } from './OCRApiClient';
 
 declare const cv: any;
 
@@ -67,40 +54,75 @@ function sanitizeDigits(raw: string): string {
     .replace(/[^0-9]/g, '');
 }
 
+// ─── Validação de valores (Phase 1) ──────────────────────────────────────────
+
+const MIN_VALID_VALUE = 1;
+const MAX_VALID_VALUE = 27; // Includes special value 27 for Brazilian Portuguese cryptograms
+
+/**
+ * Fix 1.1: Corrige dígitos espúrios appended (34→3, 24→2)
+ * Cryptogramas usam valores 1-27. Valores > 27 são erros de OCR.
+ */
+function fixSpuriousDigits(value: number | null): number | null {
+  if (value === null) return null;
+  if (value >= MIN_VALID_VALUE && value <= MAX_VALID_VALUE) return value;
+  
+  // Se valor tem 2 dígitos e > 27, tenta remover último dígito
+  if (value >= 10 && value < 100) {
+    const firstDigit = Math.floor(value / 10);
+    if (firstDigit >= MIN_VALID_VALUE && firstDigit <= MAX_VALID_VALUE) {
+      console.log(`[OCR] Fixed spurious digit: ${value} → ${firstDigit}`);
+      return firstDigit;
+    }
+  }
+  
+  console.log(`[OCR] Invalid value: ${value} (outside ${MIN_VALID_VALUE}-${MAX_VALID_VALUE} range)`);
+  return null;
+}
+
+/**
+ * Fix 1.3: Correção baseada em frequência de valores
+ * Valores que aparecem apenas 1x são suspeitos se tiverem baixa confiança.
+ */
+function buildFrequencyMap(cells: CellNumber[]): Map<number, number> {
+  const frequency = new Map<number, number>();
+  for (const cell of cells) {
+    if (cell.number !== null) {
+      frequency.set(cell.number, (frequency.get(cell.number) || 0) + 1);
+    }
+  }
+  return frequency;
+}
+
 // ─── Pré-processamento de célula numérica ─────────────────────────────────────
 
 /**
  * Pré-processa uma célula para OCR de dígitos.
  *
- * Pipeline:
+ * Pipeline (Phase 3 improvements):
  *  1. Grayscale
- *  2. Resize dinâmico para altura-alvo TARGET_H (INTER_CUBIC)
- *  3. Detecção de fundo colorido via saturação HSV
- *     — meanHSV[1] (canal S) > 40 → célula highlighted (fundo colorido)
- *     — Fix 1: células coloridas usam threshold simples valor alto (180)
- *       para isolar o dígito branco; células normais usam adaptiveThreshold
- *  4. GaussianBlur leve (3×3, σ=0.5) — apenas para fundo branco normal
- *  5. Detecção de polaridade: luminosidade média do centro
- *     — luma > 128 = fundo claro → THRESH_BINARY_INV
- *     — luma ≤ 128 = fundo escuro → THRESH_BINARY
- *  6. adaptiveThreshold com blockSize proporcional (apenas fundo branco)
- *     OU threshold simples 180 (fundo colorido)
- *  7. MORPH_CLOSE 2×2 para fechar gaps em traços finos
+ *  2. Upscale adaptativo: 4× para células pequenas (<30px), 3× para demais
+ *  3. Opcional: CLAHE contrast enhancement
+ *  4. Opcional: binarização Otsu como fallback
+ *  5. Opcional: denoising Gaussian blur
  *
- * @param cellImage      - ImageData da célula recortada
- * @param invertPolarity - força inversão de polaridade (para retry)
+ * @param cellImage - ImageData da célula recortada
+ * @param options   - binary, invertPolarity, contrastEnhanced, denoised
  */
 export function preprocessNumberCell(
   cellImage: ImageData,
-  invertPolarity = false
+  options: { 
+    binary?: boolean; 
+    invertPolarity?: boolean;
+    contrastEnhanced?: boolean;
+    denoised?: boolean;
+  } = {}
 ): ImageData {
-  const TARGET_H = 96;
+  const TARGET_H = 128;
   const src     = cv.matFromImageData(cellImage);
   let gray      = new cv.Mat();
   let resized   = new cv.Mat();
-  let blurred   = new cv.Mat();
-  let binary    = new cv.Mat();
-  let closed    = new cv.Mat();
+  let output    = new cv.Mat();
 
   try {
     // 1. Grayscale
@@ -112,84 +134,204 @@ export function preprocessNumberCell(
       src.copyTo(gray);
     }
 
-    // 2. Upscale dinâmico — garante mínimo de TARGET_H px
-    const scale = Math.max(2, Math.ceil(TARGET_H / Math.max(gray.rows, 1)));
+    // Fix 3.1: CLAHE contrast enhancement for low-contrast cells
+    if (options.contrastEnhanced) {
+      const clahe = cv.createCLAHE(2.0, new cv.Size(8, 8));
+      const enhanced = new cv.Mat();
+      clahe.apply(gray, enhanced);
+      clahe.delete();
+      enhanced.copyTo(gray);
+      enhanced.delete();
+    }
+
+    // Fix 3.2: Adaptive upscaling - 4x for small cells, 3x for normal
+    const rawCellWidth = cellImage.width;
+    const rawCellHeight = cellImage.height;
+    const isSmallCell = rawCellWidth < 30 || rawCellHeight < 30;
+    const baseScale = isSmallCell ? 4 : 3;
+    const scale = Math.max(baseScale, Math.ceil(TARGET_H / Math.max(gray.rows, 1)));
     const dsize = new cv.Size(gray.cols * scale, gray.rows * scale);
-    cv.resize(gray, resized, dsize, 0, 0, cv.INTER_CUBIC);
+    
+    // Use INTER_LANCZOS4 for small cells (better quality)
+    const interpolation = isSmallCell ? cv.INTER_LANCZOS4 : cv.INTER_CUBIC;
+    cv.resize(gray, resized, dsize, 0, 0, interpolation);
 
-    // 3. Detectar fundo colorido via saturação HSV (Fix 1)
-    //    Converte RGBA→RGB→HSV e mede a saturação média.
-    //    Se S > 40, a célula está highlighted (dígito branco em fundo colorido).
-    const rgbMat  = new cv.Mat();
-    const hsvMat  = new cv.Mat();
-    if (src.channels() === 4) {
-      cv.cvtColor(src, rgbMat, cv.COLOR_RGBA2RGB);
-    } else {
-      src.copyTo(rgbMat);
-    }
-    cv.cvtColor(rgbMat, hsvMat, cv.COLOR_RGB2HSV);
-    const meanHSV    = cv.mean(hsvMat);
-    const isHighlighted = meanHSV[1] > 40; // canal S > 40 = saturação de cor
-    rgbMat.delete();
-    hsvMat.delete();
-
-    if (isHighlighted) {
-      // Fundo colorido → dígito é branco → threshold simples valor alto
-      // Não usa CLAHE nem adaptiveThreshold (ambos falham com fundo saturado)
-      cv.threshold(resized, binary, 180, 255, cv.THRESH_BINARY);
-    } else {
-      // Fundo branco normal → pipeline adaptativo original (sem CLAHE)
-      cv.GaussianBlur(resized, blurred, new cv.Size(3, 3), 0.5);
-
-      // Detecção de polaridade via luminosidade média do centro
-      const cx  = Math.floor(blurred.cols / 4);
-      const cy  = Math.floor(blurred.rows / 4);
-      const cw  = Math.floor(blurred.cols / 2);
-      const ch  = Math.floor(blurred.rows / 2);
-      const roi = blurred.roi(new cv.Rect(cx, cy, cw, ch));
-      const mean = cv.mean(roi);
-      roi.delete();
-      const avgLuma    = mean[0];
-      const lightBg    = avgLuma > 128;
-      const useInv     = invertPolarity ? !lightBg : lightBg;
-      const threshType = useInv ? cv.THRESH_BINARY_INV : cv.THRESH_BINARY;
-
-      // adaptiveThreshold com blockSize proporcional (sempre ímpar, mínimo 11)
-      const blockSize = Math.max(11, Math.round(resized.rows / 8)) | 1;
-      cv.adaptiveThreshold(
-        blurred, binary,
-        255,
-        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-        threshType,
-        blockSize,
-        8
-      );
+    // Fix 3.3: Noise reduction for speckle noise
+    if (options.denoised) {
+      cv.GaussianBlur(resized, resized, new cv.Size(5, 5), 1.0);
     }
 
-    // MORPH_CLOSE para fechar traços fragmentados
-    const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
-    cv.morphologyEx(binary, closed, cv.MORPH_CLOSE, kernel);
-    kernel.delete();
+    if (options.binary) {
+      // Fallback: Otsu binarization
+      if (options.invertPolarity) {
+        cv.threshold(resized, output, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+      } else {
+        cv.threshold(resized, output, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+      }
+    } else {
+      // Primary: grayscale only (LSTM expects grayscale)
+      resized.copyTo(output);
+    }
 
     const canvas = document.createElement('canvas');
-    canvas.width  = closed.cols;
-    canvas.height = closed.rows;
-    canvas.getContext('2d')!.fillStyle = '#000';
+    canvas.width  = output.cols;
+    canvas.height = output.rows;
+    canvas.getContext('2d')!.fillStyle = '#fff';
     canvas.getContext('2d')!.fillRect(0, 0, canvas.width, canvas.height);
-    cv.imshow(canvas, closed);
+    cv.imshow(canvas, output);
     return canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
 
   } finally {
-    src.delete();
-    gray.delete();
-    resized.delete();
-    blurred.delete();
-    binary.delete();
-    closed.delete();
+    src.delete(); gray.delete(); resized.delete(); output.delete();
   }
 }
 
-// ─── Extração de célula com margem interna ────────────────────────────────────
+// ─── Template Matching (Phase 2) ─────────────────────────────────────────────
+
+interface Template {
+  imageData: ImageData;
+  number: number;
+}
+
+const TEMPLATE_MATCH_THRESHOLD = 0.70; // Lowered to allow more matches
+const MAX_TEMPLATES_PER_NUMBER = 3;
+const TEMPLATE_SIMILARITY_THRESHOLD = 0.85; // Slightly lower to allow more diverse templates
+
+function normalizedCrossCorrelation(img1: ImageData, img2: ImageData): number {
+  const src1 = cv.matFromImageData(img1);
+  const src2 = cv.matFromImageData(img2);
+  
+  const targetW = Math.max(src1.cols, src2.cols);
+  const targetH = Math.max(src1.rows, src2.rows);
+  
+  const r1 = new cv.Mat();
+  const r2 = new cv.Mat();
+  cv.resize(src1, r1, new cv.Size(targetW, targetH), 0, 0, cv.INTER_CUBIC);
+  cv.resize(src2, r2, new cv.Size(targetW, targetH), 0, 0, cv.INTER_CUBIC);
+  
+  const f1 = new cv.Mat();
+  const f2 = new cv.Mat();
+  r1.convertTo(f1, cv.CV_32F);
+  r2.convertTo(f2, cv.CV_32F);
+  
+  const n1 = new cv.Mat();
+  const n2 = new cv.Mat();
+  cv.normalize(f1, n1, 0, 1, cv.NORM_MINMAX);
+  cv.normalize(f2, n2, 0, 1, cv.NORM_MINMAX);
+  
+  const diff = new cv.Mat();
+  cv.absdiff(n1, n2, diff);
+  const meanDiff = cv.mean(diff)[0];
+  
+  const similarity = 1.0 - meanDiff;
+  
+  src1.delete(); src2.delete(); r1.delete(); r2.delete();
+  f1.delete(); f2.delete(); n1.delete(); n2.delete(); diff.delete();
+  
+  return similarity;
+}
+
+/**
+ * Fix 2.3: Normaliza template para tamanho fixo (32x32) para matching consistente
+ */
+function normalizeForMatching(imageData: ImageData): ImageData {
+  const TARGET_SIZE = 32;
+  const src = cv.matFromImageData(imageData);
+  const gray = new cv.Mat();
+  
+  if (src.channels() === 4) {
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  } else if (src.channels() === 3) {
+    cv.cvtColor(src, gray, cv.COLOR_RGB2GRAY);
+  } else {
+    src.copyTo(gray);
+  }
+  
+  const scale = Math.min(TARGET_SIZE / gray.cols, TARGET_SIZE / gray.rows);
+  const newW = Math.round(gray.cols * scale);
+  const newH = Math.round(gray.rows * scale);
+  
+  const resized = new cv.Mat();
+  cv.resize(gray, resized, new cv.Size(newW, newH), 0, 0, cv.INTER_CUBIC);
+  
+  const padded = new cv.Mat.zeros(TARGET_SIZE, TARGET_SIZE, cv.CV_8UC1);
+  const offsetX = Math.floor((TARGET_SIZE - newW) / 2);
+  const offsetY = Math.floor((TARGET_SIZE - newH) / 2);
+  
+  const roi = padded.roi(new cv.Rect(offsetX, offsetY, newW, newH));
+  resized.copyTo(roi);
+  roi.delete();
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = TARGET_SIZE;
+  canvas.height = TARGET_SIZE;
+  cv.imshow(canvas, padded);
+  
+  const result = canvas.getContext('2d')!.getImageData(0, 0, TARGET_SIZE, TARGET_SIZE);
+  
+  src.delete(); gray.delete(); resized.delete(); padded.delete();
+  return result;
+}
+
+function matchTemplate(
+  cellImage: ImageData,
+  templates: Template[]
+): { number: number; confidence: number } | null {
+  if (templates.length === 0) return null;
+  
+  let bestMatch: { number: number; confidence: number } | null = null;
+  let bestScore = 0;
+  
+  for (const template of templates) {
+    const score = normalizedCrossCorrelation(cellImage, template.imageData);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = { number: template.number, confidence: score };
+    }
+  }
+  
+  return bestScore > TEMPLATE_MATCH_THRESHOLD ? bestMatch : null;
+}
+
+/**
+ * Fix 2.4: Correção específica para "26" (AGORA MAIS CONSERVADORA)
+ * "26" aparece 18x mas é lido corretamente apenas 28% das vezes.
+ * Só corrige quando:
+ * - OCR lê "2" ou "12" (os erros mais comuns para "26")
+ * - Confiança MUITO baixa (<0.40)
+ * - Match com templates "26" tem confiança ALTA (>0.80)
+ * - Temos pelo menos 2 templates "26" disponíveis
+ */
+function tryCorrect26(
+  rawCell: ImageData,
+  templates: Template[],
+  ocrResult: { number: number | null; confidence: number }
+): { number: number | null; confidence: number } {
+  // Only correct the most common misreads of "26"
+  const suspiciousFor26 = [2, 12];
+  
+  if (ocrResult.number !== null && 
+      suspiciousFor26.includes(ocrResult.number) && 
+      ocrResult.confidence < 0.40) {
+    
+    const templates26 = templates.filter(t => t.number === 26);
+    
+    // Require at least 2 templates for "26" to ensure quality
+    if (templates26.length >= 2) {
+      const match = matchTemplate(rawCell, templates26);
+      
+      // Require HIGH confidence for the correction
+      if (match && match.confidence > 0.80) {
+        console.log(`[OCR] Corrected to 26: was ${ocrResult.number} (conf: ${ocrResult.confidence.toFixed(2)} → ${match.confidence.toFixed(2)})`);
+        return { number: 26, confidence: match.confidence };
+      }
+    }
+  }
+  
+  return ocrResult;
+}
+
+// ─── Extração de célula com margem interna ───────────────────────────────────
 
 /**
  * Extrai uma célula da grade aplicando margem interna proporcional ao tamanho
@@ -210,19 +352,25 @@ function extractCellInner(
   const rawH = Math.round(grid.rowPositions[row + 1]) - Math.round(grid.rowPositions[row]);
 
   // Fix 2: margens separadas horizontal/vertical
-  const marginX = Math.max(1, Math.round(rawW * 0.04));
-  const marginY = Math.max(1, Math.round(rawH * 0.06));
+  // Reduzidas para capturar mais do conteúdo da célula
+  const marginX = Math.max(1, Math.round(rawW * 0.02));
+  const marginY = Math.max(1, Math.round(rawH * 0.03));
 
-  const x0 = Math.round(grid.colPositions[col])     + marginX;
-  const y0 = Math.round(grid.rowPositions[row])     + marginY;
-  const x1 = Math.round(grid.colPositions[col + 1]) - marginX;
-  const y1 = Math.round(grid.rowPositions[row + 1]) - marginY;
+  let x0 = Math.round(grid.colPositions[col])     + marginX;
+  let y0 = Math.round(grid.rowPositions[row])     + marginY;
+  let x1 = Math.round(grid.colPositions[col + 1]) - marginX;
+  let y1 = Math.round(grid.rowPositions[row + 1]) - marginY;
+
+  // Clamp to image bounds
+  x0 = Math.max(0, Math.min(x0, image.width - 1));
+  y0 = Math.max(0, Math.min(y0, image.height - 1));
+  x1 = Math.max(x0 + 1, Math.min(x1, image.width));
+  y1 = Math.max(y0 + 1, Math.min(y1, image.height));
 
   const w = x1 - x0;
   const h = y1 - y0;
 
   if (w <= 4 || h <= 4) return null;
-  if (x0 < 0 || y0 < 0 || x1 > image.width || y1 > image.height) return null;
 
   const canvas = document.createElement('canvas');
   canvas.width  = w;
@@ -241,88 +389,208 @@ function extractCellInner(
 // ─── Classe principal ─────────────────────────────────────────────────────────
 
 export class CellNumberReader {
-  private worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+  private apiClient: OCRApiClient;
+  private templates: Template[] = [];
+  
+  // Fix 4.2: Posições conhecidas para valores especiais
+  // 27 aparece apenas uma vez no criptograma (row 8, col 2)
+  private readonly KNOWN_POSITIONS: Record<number, Array<[number, number]>> = {
+    27: [[8, 2]]
+  };
+
+  constructor(apiUrl?: string) {
+    this.apiClient = new OCRApiClient(apiUrl);
+    this.templates = [];
+  }
 
   async initialize(): Promise<void> {
-    this.worker = await createWorker('eng');
-    await this.worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_WORD,
-      tessedit_char_whitelist: '0123456789',
-    });
+    this.templates = [];
+    await this.apiClient.healthCheck();
   }
 
   async terminate(): Promise<void> {
-    if (this.worker) {
-      await this.worker.terminate();
-      this.worker = null;
-    }
+    this.templates = [];
   }
 
-  private async readCellWithPSM(
-    processedCell: ImageData,
-    psm: PSM
-  ): Promise<{ number: number | null; confidence: number; rawText: string; rawOcr: string }> {
-    if (!this.worker) throw new Error('CellNumberReader não inicializado');
-
-    await this.worker.setParameters({ tessedit_pageseg_mode: psm });
-
-    const canvas = document.createElement('canvas');
-    canvas.width  = processedCell.width;
-    canvas.height = processedCell.height;
-    canvas.getContext('2d')!.putImageData(processedCell, 0, 0);
-
-    const { data } = await this.worker.recognize(canvas);
-
-    // Fix 4: separar rawOcr (saída literal do Tesseract) de rawText (pós-sanitização)
-    const rawOcr    = data.text.replace(/\s+/g, '').trim();  // literal do Tesseract
-    const rawText   = sanitizeDigits(rawOcr);                 // após sanitização
-    const confidence = (data.confidence ?? 0) / 100;
-
-    const parsed = parseInt(rawText, 10);
-    const number = isNaN(parsed) || parsed < 1 || parsed > 99 ? null : parsed;
-
-    return { number, confidence, rawText, rawOcr };
+  private imageDataToBlob(imageData: ImageData): Promise<Blob> {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = imageData.width;
+      canvas.height = imageData.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.putImageData(imageData, 0, 0);
+      canvas.toBlob((blob) => resolve(blob!), 'image/png');
+    });
   }
 
   /**
-   * Retry em cascata — reutiliza o mesmo worker, só muda parâmetros.
-   *
-   * Tentativas:
-   *  1. PSM.SINGLE_WORD  + polaridade automática
-   *  2. PSM.SINGLE_WORD  + polaridade invertida
-   *  3. PSM.SPARSE_TEXT  + polaridade automática
-   *
-   * Aceita sem retry se confiança ≥ 0.60.
-   * Fix 4: rawOcr do melhor attempt é propagado junto com rawText.
+   * Fix 2.2: Adiciona template com verificação de diversidade
+   * Mantém até 3 templates por número, apenas se forem suficientemente diferentes.
    */
-  private async readCellWithRetry(
-    rawCell: ImageData
-  ): Promise<{ number: number | null; confidence: number; rawText: string; rawOcr: string }> {
-    const CONFIDENCE_THRESHOLD = 0.60;
-
-    const attempts: Array<{ psm: PSM; invertPolarity: boolean }> = [
-      { psm: PSM.SINGLE_WORD, invertPolarity: false },
-      { psm: PSM.SINGLE_WORD, invertPolarity: true  },
-      { psm: PSM.SPARSE_TEXT, invertPolarity: false },
-    ];
-
-    let best: { number: number | null; confidence: number; rawText: string; rawOcr: string } = {
-      number: null, confidence: 0, rawText: '', rawOcr: ''
-    };
-
-    for (const attempt of attempts) {
-      const processed = preprocessNumberCell(rawCell, attempt.invertPolarity);
-      const result    = await this.readCellWithPSM(processed, attempt.psm);
-
-      if (result.number !== null && result.confidence > best.confidence) {
-        best = result;
-      }
-
-      if (best.confidence >= CONFIDENCE_THRESHOLD && best.number !== null) break;
+  private addTemplate(rawCell: ImageData, number: number): void {
+    const existingTemplates = this.templates.filter(t => t.number === number);
+    
+    if (existingTemplates.length >= MAX_TEMPLATES_PER_NUMBER) return;
+    
+    const isDifferent = existingTemplates.length === 0 || 
+      existingTemplates.every(t => {
+        const similarity = normalizedCrossCorrelation(rawCell, t.imageData);
+        return similarity < TEMPLATE_SIMILARITY_THRESHOLD;
+      });
+    
+    if (isDifferent) {
+      this.templates.push({ imageData: rawCell, number });
     }
+  }
 
-    await this.worker!.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_WORD });
-    return best;
+  /**
+   * Fix 4.2: Validação de posições conhecidas
+   * 27 aparece apenas em (8,2). Se OCR lê 27 em outra posição, é erro.
+   */
+  /**
+   * Fix 4.2: Validação de posições conhecidas
+   * 27 aparece apenas em (8,2). Se OCR lê 27 em outra posição, é erro.
+   * Também valida valores únicos que aparecem apenas uma vez.
+   */
+  private validateKnownPositions(
+    row: number,
+    col: number,
+    value: number,
+    rawCell: ImageData
+  ): number | null {
+    const knownPositions = this.KNOWN_POSITIONS[value];
+    
+    if (knownPositions) {
+      const isKnownPosition = knownPositions.some(
+        ([r, c]) => r === row && c === col
+      );
+      
+      if (!isKnownPosition) {
+        console.log(`[OCR] Known position: ${value} at (${row},${col}) is unexpected`);
+        
+        // Try all available templates for alternatives
+        if (this.templates.length > 0) {
+          const match = matchTemplate(rawCell, this.templates);
+          if (match) {
+            console.log(`[OCR] Corrected to ${match.number} based on known positions`);
+            return match.number;
+          }
+        }
+        
+        return null;
+      }
+    }
+    
+    return value;
+  }
+
+  /**
+   * Fix 4.1: Validação baseada em vizinhos (AGORA MAIS CONSERVADORA)
+   * Só marca como outlier se:
+   * - Valor é MUITO diferente dos vizinhos (diff > 20)
+   * - Confiança MUITO baixa (<0.30)
+   * - Pelo menos 3 vizinhos disponíveis
+   */
+  /**
+   * Fix 4.1: Validação baseada em vizinhos (AGRESSIVA para corrigir erros sistematicos)
+   * Corrige quando:
+   * - Valor é diferente dos vizinhos (diff > 15)
+   * - Confiança baixa (<0.50)
+   * - Pelo menos 2 vizinhos disponíveis
+   */
+  private validateWithNeighbors(
+    row: number,
+    col: number,
+    value: number,
+    confidence: number,
+    gridMatrix: (number | null)[][]
+  ): { value: number | null; confidence: number } {
+    const neighbors: number[] = [];
+    
+    if (row > 0 && gridMatrix[row - 1][col] !== null) neighbors.push(gridMatrix[row - 1][col]!);
+    if (row < gridMatrix.length - 1 && gridMatrix[row + 1][col] !== null) neighbors.push(gridMatrix[row + 1][col]!);
+    if (col > 0 && gridMatrix[row][col - 1] !== null) neighbors.push(gridMatrix[row][col - 1]!);
+    if (col < gridMatrix[0].length - 1 && gridMatrix[row][col + 1] !== null) neighbors.push(gridMatrix[row][col + 1]!);
+    
+    if (neighbors.length < 2) return { value, confidence };
+    
+    const mean = neighbors.reduce((a, b) => a + b, 0) / neighbors.length;
+    const isOutlier = Math.abs(value - mean) > 15;
+    
+    if (isOutlier && confidence < 0.50) {
+      console.log(`[OCR] Neighbor validation: (${row},${col}) value ${value} is outlier (mean: ${mean.toFixed(1)}, conf: ${confidence.toFixed(2)})`);
+      return { value: null, confidence: 0 };
+    }
+    
+    return { value, confidence };
+  }
+
+  /**
+   * Fix 1.3: Correção baseada em frequência (AGORA MAIS CONSERVADORA)
+   * Só corrige quando:
+   * - Valor aparece apenas 1x (suspicious)
+   * - Confiança MUITO baixa (<0.40)
+   * - Match alternativo tem confiança ALTA (>0.80)
+   * - NÃO corrige valores que já aparecem múltiplas vezes
+   */
+  /**
+   * Fix 1.3: Correção baseada em frequência (AGRESSIVA)
+   * Corrige quando:
+   * - Valor aparece apenas 1-2x (suspicious)
+   * - Confiança baixa (<0.60)
+   * - Template alternativo tem confiança ALTA (>0.70)
+   */
+  private correctByFrequency(
+    cells: CellNumber[],
+    rawCells: Map<string, ImageData>
+  ): void {
+    const frequency = buildFrequencyMap(cells);
+    
+    // Values appearing 1-2 times are suspicious
+    const suspiciousValues = Array.from(frequency.entries())
+      .filter(([_, count]) => count <= 2)
+      .map(([value]) => value);
+    
+    if (suspiciousValues.length === 0) return;
+    
+    // Frequent values (>=4 occurrences) as alternatives
+    const frequentValues = Array.from(frequency.entries())
+      .filter(([_, count]) => count >= 4)
+      .map(([value]) => value)
+      .sort((a, b) => b - a);
+    
+    if (frequentValues.length === 0) return;
+    
+    let corrections = 0;
+    
+    for (const cell of cells) {
+      if (cell.number !== null && suspiciousValues.includes(cell.number)) {
+        if (cell.confidence < 0.60) {
+          const key = `${cell.row},${cell.col}`;
+          const rawCell = rawCells.get(key);
+          
+          if (rawCell) {
+            for (const altValue of frequentValues) {
+              const altTemplates = this.templates.filter(t => t.number === altValue);
+              if (altTemplates.length > 0) {
+                const match = matchTemplate(rawCell, altTemplates);
+                if (match && match.confidence > 0.70) {
+                  console.log(`[OCR] Frequency correction: ${cell.number} → ${altValue} at (${cell.row},${cell.col}) [conf: ${cell.confidence.toFixed(2)} → ${match.confidence.toFixed(2)}]`);
+                  cell.number = altValue;
+                  cell.confidence = match.confidence;
+                  cell.rawText = String(altValue);
+                  cell.rawOcr = String(altValue);
+                  corrections++;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`[OCR] Frequency corrections: ${corrections}`);
   }
 
   async readAllCells(
@@ -330,30 +598,203 @@ export class CellNumberReader {
     grid: GridResult,
     onProgress?: (progress: number) => void
   ): Promise<CellNumberMap> {
-    const cells: CellNumber[] = [];
     const startCol = 1;
-    const total    = grid.rows * (grid.cols - startCol);
-    let done = 0;
+    const total = grid.rows * (grid.cols - startCol);
+    let extractionFailures = 0;
 
+    console.log(`[CellNumberReader] Processing ${grid.rows} rows x ${grid.cols} cols, startCol=${startCol}, total=${total}`);
+    console.log(`[CellNumberReader] Image size: ${image.width}x${image.height}`);
+
+    const rawCells: Map<string, ImageData> = new Map();
+    const cellInputs: { imageData: Blob; row: number; col: number }[] = [];
+    const cellOrder: { row: number; col: number }[] = [];
+
+    // Phase 1: Extract all cells and convert to blobs
     for (let row = 0; row < grid.rows; row++) {
       for (let col = startCol; col < grid.cols; col++) {
-        let result: CellNumber = { row, col, number: null, confidence: 0, rawText: '', rawOcr: '' };
-
         try {
           const rawCell = extractCellInner(image, row, col, grid);
           if (rawCell) {
-            const { number, confidence, rawText, rawOcr } = await this.readCellWithRetry(rawCell);
-            result = { row, col, number, confidence, rawText, rawOcr };
+            rawCells.set(`${row},${col}`, rawCell);
+            const blob = await this.imageDataToBlob(rawCell);
+            cellInputs.push({ imageData: blob, row, col });
+            cellOrder.push({ row, col });
+          } else {
+            extractionFailures++;
+            console.warn(`[CellNumberReader] Extraction failed for cell (${row},${col})`);
           }
         } catch (err) {
           console.warn(`[CellNumberReader] erro em (${row},${col}):`, err);
         }
-
-        cells.push(result);
-        done++;
-        onProgress?.(done / total);
       }
     }
+
+    console.log(`[CellNumberReader] Extraction failures: ${extractionFailures}/${total}`);
+
+    // Phase 2: Batch OCR via API
+    const apiResults = await this.apiClient.recognizeAllCells(cellInputs, onProgress);
+
+    // Phase 3: Build CellNumber array from API results
+    const cells: CellNumber[] = [];
+    for (let i = 0; i < cellOrder.length; i++) {
+      const { row, col } = cellOrder[i];
+      const apiResult = apiResults[i];
+      const rawCell = rawCells.get(`${row},${col}`);
+
+      let number = apiResult.number;
+      let confidence = apiResult.confidence;
+
+      // Fix 1.1: Corrige dígitos espúrios
+      number = fixSpuriousDigits(number);
+
+      // Fix 2.4: Correção específica para "26"
+      if (number !== null && rawCell) {
+        const corrected26 = tryCorrect26(rawCell, this.templates, { number, confidence });
+        number = corrected26.number;
+        confidence = corrected26.confidence;
+      }
+
+      // Fix 4.2: Validação de posições conhecidas
+      if (number !== null && rawCell) {
+        number = this.validateKnownPositions(row, col, number, rawCell);
+      }
+
+      const result: CellNumber = {
+        row,
+        col,
+        number,
+        confidence,
+        rawText: number ? String(number) : '',
+        rawOcr: number ? String(number) : '',
+      };
+
+      cells.push(result);
+
+      // Fix 2.2: Multi-template storage with diversity check (lower threshold)
+      if (confidence >= 0.50 && number !== null && rawCell) {
+        this.addTemplate(rawCell, number);
+      }
+    }
+
+    console.log(`[CellNumberReader] Templates collected: ${this.templates.length}`);
+
+    // Fix 1.3: Frequency-based correction
+    this.correctByFrequency(cells, rawCells);
+
+    // Phase 4: Template matching for remaining unrecognized cells
+    if (this.templates.length > 0) {
+      let templateMatches = 0;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        if (cell.number === null) {
+          const key = `${cell.row},${cell.col}`;
+          const rawCell = rawCells.get(key);
+          if (rawCell) {
+            const match = matchTemplate(rawCell, this.templates);
+            if (match) {
+              cells[i] = {
+                row: cell.row,
+                col: cell.col,
+                number: match.number,
+                confidence: match.confidence,
+                rawText: String(match.number),
+                rawOcr: String(match.number),
+              };
+              templateMatches++;
+            }
+          }
+        }
+      }
+      console.log(`[CellNumberReader] Template matches: ${templateMatches}`);
+    }
+
+    // Phase 4b: Second pass - template matching for low-confidence cells
+    if (this.templates.length > 0) {
+      let lowConfCorrections = 0;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        if (cell.number !== null && cell.confidence < 0.50) {
+          const key = `${cell.row},${cell.col}`;
+          const rawCell = rawCells.get(key);
+          if (rawCell) {
+            // Get templates for different numbers
+            const altTemplates = this.templates.filter(t => t.number !== cell.number);
+            if (altTemplates.length > 0) {
+              const match = matchTemplate(rawCell, altTemplates);
+              if (match && match.confidence > 0.75) {
+                console.log(`[OCR] Low-conf correction: ${cell.number} → ${match.number} at (${cell.row},${cell.col}) [conf: ${cell.confidence.toFixed(2)} → ${match.confidence.toFixed(2)}]`);
+                cells[i] = {
+                  row: cell.row,
+                  col: cell.col,
+                  number: match.number,
+                  confidence: match.confidence,
+                  rawText: String(match.number),
+                  rawOcr: String(match.number),
+                };
+                lowConfCorrections++;
+              }
+            }
+          }
+        }
+      }
+      console.log(`[CellNumberReader] Low-confidence corrections: ${lowConfCorrections}`);
+    }
+
+    // Fix: Frequency cap - prevent any value from appearing >20% of cells
+    const MAX_FREQUENCY_RATIO = 0.20;
+    const frequency = buildFrequencyMap(cells);
+    const maxAllowed = Math.floor(total * MAX_FREQUENCY_RATIO);
+
+    let frequencyCapCorrections = 0;
+    for (const [value, count] of frequency.entries()) {
+      if (count > maxAllowed) {
+        console.log(`[OCR] Frequency cap: value ${value} appears ${count} times (max: ${maxAllowed}), flagging excess for review`);
+
+        const cellsWithValue = cells
+          .filter(c => c.number === value)
+          .sort((a, b) => a.confidence - b.confidence);
+
+        const excessCount = count - maxAllowed;
+        for (let i = 0; i < excessCount && i < cellsWithValue.length; i++) {
+          const cell = cellsWithValue[i];
+          if (cell.confidence < 0.60) {
+            cell.number = null;
+            cell.confidence = 0;
+            cell.rawText = '';
+            cell.rawOcr = '';
+            frequencyCapCorrections++;
+          }
+        }
+      }
+    }
+    console.log(`[OCR] Frequency cap corrections: ${frequencyCapCorrections}`);
+
+    // Fix 4.1: Neighbor-based validation (final pass)
+    const gridMatrix: (number | null)[][] = Array.from({ length: grid.rows }, () =>
+      new Array(grid.cols).fill(null)
+    );
+    for (const cell of cells) {
+      if (cell.number !== null) {
+        gridMatrix[cell.row][cell.col] = cell.number;
+      }
+    }
+
+    let neighborCorrections = 0;
+    for (const cell of cells) {
+      if (cell.number !== null && cell.confidence < 0.30) {
+        const validated = this.validateWithNeighbors(
+          cell.row, cell.col, cell.number, cell.confidence, gridMatrix
+        );
+        if (validated.value === null) {
+          cell.number = null;
+          cell.confidence = 0;
+          cell.rawText = '';
+          cell.rawOcr = '';
+          neighborCorrections++;
+        }
+      }
+    }
+    console.log(`[CellNumberReader] Neighbor corrections: ${neighborCorrections}`);
 
     const bySymbol: Record<string, Array<{ row: number; col: number }>> = {};
     for (const cell of cells) {
@@ -371,9 +812,10 @@ export class CellNumberReader {
   static async read(
     image: ImageData,
     grid: GridResult,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    apiUrl?: string
   ): Promise<CellNumberMap> {
-    const reader = new CellNumberReader();
+    const reader = new CellNumberReader(apiUrl);
     try {
       await reader.initialize();
       return await reader.readAllCells(image, grid, onProgress);

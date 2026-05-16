@@ -26,8 +26,11 @@ interface Props {
   onCellClick?: (cell: CellNumber) => void;
 }
 
+const MAX_VALID_NUMBER = 27; // Includes special value 27 for Brazilian Portuguese cryptograms
+
 function confidenceColor(cell: CellNumber): string {
   if (cell.number === null) return '#d1d5db';
+  if (cell.number > MAX_VALID_NUMBER) return '#fca5a5'; // Red for invalid (>27)
   if (cell.confidence >= 0.8)  return '#bbf7d0';
   if (cell.confidence >= 0.5)  return '#fef08a';
   return '#fecaca';
@@ -35,6 +38,7 @@ function confidenceColor(cell: CellNumber): string {
 
 function confidenceTextColor(cell: CellNumber): string {
   if (cell.number === null) return '#6b7280';
+  if (cell.number > MAX_VALID_NUMBER) return '#991b1b';
   if (cell.confidence >= 0.8)  return '#166534';
   if (cell.confidence >= 0.5)  return '#854d0e';
   return '#991b1b';
@@ -136,6 +140,15 @@ export function CellNumberOverlay({ cellNumbers, grid, backgroundImage, onCellCl
   const coverage = total > 0 ? ((recognized / total) * 100).toFixed(0) : '0';
   const uniqueCount = Object.keys(cellNumbers.bySymbol).length;
 
+  // Calculate true accuracy (excluding invalid values > 26)
+  const MAX_VALID_NUMBER = 26;
+  const invalidCells = cellNumbers.cells.filter(c => c.number !== null && c.number > MAX_VALID_NUMBER);
+  const lowConfCells = cellNumbers.cells.filter(c => c.number !== null && c.confidence < 0.60);
+  const trulyValid = cellNumbers.cells.filter(c => 
+    c.number !== null && c.number <= MAX_VALID_NUMBER && c.confidence >= 0.60
+  ).length;
+  const trueAccuracy = total > 0 ? ((trulyValid / total) * 100).toFixed(0) : '0';
+
   const rowCount = grid.rows;
   const colCount = grid.cols - 1;
   const CELL_W = 52;
@@ -164,6 +177,15 @@ export function CellNumberOverlay({ cellNumbers, grid, backgroundImage, onCellCl
           color={Number(coverage) >= 70 ? '#166534' : Number(coverage) >= 50 ? '#854d0e' : '#991b1b'}
           bg={Number(coverage) >= 70 ? '#bbf7d0' : Number(coverage) >= 50 ? '#fef08a' : '#fecaca'}
         />
+        <Stat
+          label="Precisão real"
+          value={`${trueAccuracy}%`}
+          color={Number(trueAccuracy) >= 90 ? '#166534' : Number(trueAccuracy) >= 70 ? '#854d0e' : '#991b1b'}
+          bg={Number(trueAccuracy) >= 90 ? '#bbf7d0' : Number(trueAccuracy) >= 70 ? '#fef08a' : '#fecaca'}
+        />
+        {invalidCells.length > 0 && (
+          <Stat label="Inválidos (>26)" value={String(invalidCells.length)} color="#991b1b" bg="#fecaca" />
+        )}
         <Stat label="Símbolos únicos" value={String(uniqueCount)} color="#1e40af" bg="#bfdbfe" />
         <div style={s.legend}>
           <LegendDot color="#bbf7d0" textColor="#166534" label="conf ≥ 80%" />
@@ -220,6 +242,9 @@ export function CellNumberOverlay({ cellNumbers, grid, backgroundImage, onCellCl
                     : `(${row},${col}) sem dado`}
                 >
                   <span style={s.cellNum}>{cell?.number ?? '–'}</span>
+                  {cell && cell.number !== null && cell.number > MAX_VALID_NUMBER && (
+                    <span style={s.invalidBadge}>⚠️</span>
+                  )}
                   <span style={s.cellConf}>{cell ? `${(cell.confidence * 100).toFixed(0)}%` : ''}</span>
                 </div>
               );
@@ -236,7 +261,14 @@ export function CellNumberOverlay({ cellNumbers, grid, backgroundImage, onCellCl
           </div>
           <div style={s.tooltipRow}>
             <span style={s.tooltipLabel}>Número</span>
-            <strong>{tooltip.cell.number ?? 'não lido'}</strong>
+            <strong style={
+              tooltip.cell.number !== null && tooltip.cell.number > MAX_VALID_NUMBER
+                ? { color: '#ef4444' }
+                : {}
+            }>
+              {tooltip.cell.number ?? 'não lido'}
+              {tooltip.cell.number !== null && tooltip.cell.number > MAX_VALID_NUMBER && ' (inválido)'}
+            </strong>
           </div>
           <div style={s.tooltipRow}>
             <span style={s.tooltipLabel}>Confiança</span>
@@ -306,6 +338,7 @@ const s: Record<string, React.CSSProperties> = {
   exportBtn:       { padding: '6px 14px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
   cell:            { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: '1px solid rgba(0,0,0,0.08)', transition: 'filter 0.1s', userSelect: 'none' },
   cellNum:         { fontSize: 15, fontWeight: 700, lineHeight: 1 },
+  invalidBadge:    { fontSize: 10, lineHeight: 1 },
   cellConf:        { fontSize: 9, opacity: 0.75, marginTop: 1 },
   tooltip:         { position: 'fixed', background: '#1f2937', color: '#f9fafb', borderRadius: 8, padding: '8px 12px', fontSize: 12, zIndex: 9999, pointerEvents: 'none', minWidth: 180, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' },
   tooltipRow:      { display: 'flex', gap: 8, justifyContent: 'space-between', marginBottom: 3 },

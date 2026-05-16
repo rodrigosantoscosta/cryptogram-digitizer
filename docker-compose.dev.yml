@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  ocr-service:
+    build: ./ocr-service
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./ocr-service:/app
+      - /app/models
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    command: uvicorn main:app --host 0.0.0.0 --port 5000 --reload --log-level debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - cryptogram-net
+
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - OCR_SERVICE_URL=http://ocr-service:5000
+      - PORT=4000
+      - HOST=0.0.0.0
+    command: npm run dev
+    depends_on:
+      ocr-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cryptogram-net
+
+networks:
+  cryptogram-net:
+    driver: bridge

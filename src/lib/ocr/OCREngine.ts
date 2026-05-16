@@ -20,7 +20,7 @@ export class OCREngine {
     this.worker = await createWorker(lang);
 
     const params: Partial<Tesseract.WorkerParams> = {
-      tessedit_pageseg_mode: this.config.pageSegMode ?? PSM.SINGLE_COLUMN,
+      tessedit_pageseg_mode: (this.config.pageSegMode ?? PSM.SINGLE_COLUMN) as PSM,
     };
     if (this.config.whitelist) {
       params['tessedit_char_whitelist'] = this.config.whitelist;
@@ -162,7 +162,7 @@ export class OCREngine {
 
     if (psm !== undefined) {
       await this.worker.setParameters({
-        tessedit_pageseg_mode: this.config.pageSegMode ?? PSM.SINGLE_COLUMN,
+        tessedit_pageseg_mode: (this.config.pageSegMode ?? PSM.SINGLE_COLUMN) as PSM,
       });
     }
 

@@ -140,7 +140,7 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
           {Object.entries(mapping).map(([symbolId, letter]) =>
             letter ? (
               <span key={symbolId} style={s.chip}>
-                <span style={s.chipId}>{symbolId.replace('symbol_', '#').replace('symbol-', '#')}</span>
+                <span style={s.chipId}>{/^\d+$/.test(symbolId) ? `#${symbolId}` : symbolId.replace(/^cluster_/, '#').replace(/^symbol[-_]/, '#')}</span>
                 <span style={s.chipArrow}>→</span>
                 <span style={s.chipLetter}>{letter}</span>
               </span>
@@ -157,7 +157,7 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
 import type { GridCell } from '../types/grid';
 
 function buildGrid(data: ProcessedData): GridCell[][] {
-  const { grid, extractedSymbols } = data;
+  const { grid, uniqueSymbols } = data;
   const rows = grid.rows;
   const cols = grid.cols - 1; // skip clue column 0
 
@@ -165,17 +165,19 @@ function buildGrid(data: ProcessedData): GridCell[][] {
     Array.from({ length: cols }, (_, c) => ({
       row: r,
       col: c,
-      symbolId: null,
-      letter: '',
+      symbolId: undefined,
       isClue: false,
-    } as GridCell)),
+    } satisfies GridCell)),
   );
 
-  for (const sym of extractedSymbols) {
-    const r = sym.row;
-    const c = sym.col - 1; // shift: clue col removed
-    if (r >= 0 && r < rows && c >= 0 && c < cols) {
-      matrix[r][c] = { ...matrix[r][c], symbolId: sym.symbolId };
+  // uniqueSymbols.occurrences contém as posições reais (col já inclui offset da coluna de pistas)
+  for (const sym of uniqueSymbols) {
+    for (const pos of sym.occurrences) {
+      const r = pos.row;
+      const c = pos.col - 1; // remove coluna de pistas (col 0)
+      if (r >= 0 && r < rows && c >= 0 && c < cols) {
+        matrix[r][c] = { ...matrix[r][c], symbolId: sym.symbolId };
+      }
     }
   }
 

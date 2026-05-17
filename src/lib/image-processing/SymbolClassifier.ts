@@ -12,6 +12,7 @@ import type {
   UniqueSymbol,
   SymbolCluster
 } from '@/types';
+import type { CellNumberMap } from '@/lib/ocr/CellNumberReader';
 
 export class SymbolClassifier {
 
@@ -326,4 +327,84 @@ export class SymbolClassifier {
       ...newUniqueSymbols
     ];
   }
+
+  // ─── Caminho numérico (criptogramas com números nas células) ───────────
+
+  /**
+   * Constrói UniqueSymbol[] diretamente a partir do CellNumberMap.
+   *
+   * Quando o CellNumberReader detectou números com sucesso, este método
+   * substitui completamente o pipeline de clustering visual (pHash + Hu Moments).
+   * O symbolId de cada UniqueSymbol é o próprio número como string ("1".."27"),
+   * o que torna o mapeamento trivialmente correto e determinístico.
+   *
+   * O `representative` de cada UniqueSymbol é gerado com ImageData vazio (1×1)
+   * porque a UI de mapeamento numérico usa o número diretamente — não a imagem.
+   *
+   * @param cellNumbers      - Resultado do CellNumberReader
+   * @param extractedSymbols - Símbolos visuais extraídos (usados como fonte de
+   *   `representative.imageData` quando disponíveis, para exibição na UI)
+   */
+  static buildFromNumbers(
+    cellNumbers: CellNumberMap,
+    extractedSymbols: ExtractedSymbol[] = []
+  ): UniqueSymbol[] {
+    // Construir índice de imageData por posição, para enriquecer o representative
+    const imgByPos = new Map<string, ImageData>();
+    for (const sym of extractedSymbols) {
+      for (const pos of sym.positions) {
+        imgByPos.set(`${pos.row}:${pos.col}`, sym.imageData);
+      }
+    }
+
+    // Construir UniqueSymbol por número único, na ordem numérica
+    const sortedKeys = Object.keys(cellNumbers.bySymbol).sort((a, b) => Number(a) - Number(b));
+
+    return sortedKeys.map(numStr => {
+      const positions = cellNumbers.bySymbol[numStr];
+
+      // Tentar encontrar ImageData representativa de qualquer ocorrência
+      let representativeImageData: ImageData = new ImageData(1, 1);
+      const blankFeatures = makeBlankFeatures();
+
+      for (const pos of positions) {
+        const img = imgByPos.get(`${pos.row}:${pos.col}`);
+        if (img) {
+          representativeImageData = img;
+          break;
+        }
+      }
+
+      const representative: ExtractedSymbol = {
+        id: numStr,
+        imageData: representativeImageData,
+        features: blankFeatures,
+        positions: positions.map(p => ({ row: p.row, col: p.col })),
+        hash: `num_${numStr.padStart(3, '0')}`,
+      };
+
+      return {
+        symbolId: numStr,
+        representative,
+        // As posições do CellNumberReader já são baseadas em col real (startCol=1).
+        // Não aplicar offset adicional para não deslocar o CellNumberOverlay.
+        occurrences: positions.map(p => ({ row: p.row, col: p.col })),
+        mappedLetter: null,
+      } satisfies UniqueSymbol;
+    });
+  }
+}
+
+// ─── Helpers privados do módulo ─────────────────────────────────────────────────────
+
+function makeBlankFeatures(): import('@/types').SymbolFeatures {
+  return {
+    area: 0,
+    perimeter: 0,
+    aspectRatio: 1,
+    moments: new Array(7).fill(0),
+    histogram: new Array(256).fill(0),
+    centerOfMass: { x: 0, y: 0 },
+    extent: 0,
+  };
 }

@@ -15,6 +15,8 @@ import { TableDetector } from '@/lib/image-processing/TableDetector';
 import { SymbolExtractor } from '@/lib/image-processing/SymbolExtractor';
 import { SymbolClassifier } from '@/lib/image-processing/SymbolClassifier';
 import { OCREngine } from '@/lib/ocr/OCREngine';
+import { CellNumberReader } from '@/lib/ocr/CellNumberReader';
+import type { CellNumberMap } from '@/types';
 import { PSM } from 'tesseract.js';
 
 declare const cv: any;
@@ -92,6 +94,28 @@ export function useImageProcessor() {
         });
       }
 
+      // ── Fase 3.5: Leitura de números nas células ─────────────────────────
+      setStatus({ stage: 'extracting', progress: 47, currentStep: 'Lendo números das células...', error: null });
+
+      let cellNumbers: CellNumberMap | null = null;
+      try {
+        cellNumbers = await CellNumberReader.read(
+          imageData,
+          grid,
+          (p) => {
+            const prog = Math.round(47 + p * 8); // 47 → 55
+            setStatus({ stage: 'extracting', progress: prog, currentStep: `Lendo células: ${Math.round(p * 100)}%`, error: null });
+          }
+        );
+        console.log(
+          `[CellNumberReader] ${cellNumbers.recognized}/${cellNumbers.total} células reconhecidas,`,
+          `${Object.keys(cellNumbers.bySymbol).length} símbolos únicos:`,
+          Object.keys(cellNumbers.bySymbol).sort((a, b) => Number(a) - Number(b)).join(', ')
+        );
+      } catch (numErr) {
+        console.warn('[CellNumberReader] falhou, continuando sem números:', numErr);
+      }
+
       // ── Fase 3: Extração de símbolos ─────────────────────────────────────
       setStatus({ stage: 'extracting', progress: 55, currentStep: 'Extraindo símbolos...', error: null });
 
@@ -113,7 +137,21 @@ export function useImageProcessor() {
       // ── Fase 4: Classificação ────────────────────────────────────────────
       setStatus({ stage: 'classifying', progress: 75, currentStep: 'Classificando símbolos únicos...', error: null });
 
-      const uniqueSymbols: UniqueSymbol[] = SymbolClassifier.identifyUniqueSymbols(extractedSymbols);
+      // Se o CellNumberReader reconheceu ≥70% das células, usar números como symbolId
+      // (determinístico, sem erros de clustering). Caso contrário, fallback para pHash visual.
+      const numberCoverage = cellNumbers
+        ? cellNumbers.recognized / Math.max(cellNumbers.total, 1)
+        : 0;
+      const useNumbers = numberCoverage >= 0.70;
+
+      const uniqueSymbols: UniqueSymbol[] = useNumbers
+        ? SymbolClassifier.buildFromNumbers(cellNumbers!, extractedSymbols)
+        : SymbolClassifier.identifyUniqueSymbols(extractedSymbols);
+
+      console.log(
+        `[useImageProcessor] Classificação via ${useNumbers ? `números (cobertura ${(numberCoverage * 100).toFixed(0)}%)` : 'pHash visual (fallback)'},`,
+        `${uniqueSymbols.length} símbolos únicos`
+      );
 
       setStatus({
         stage: 'classifying',
@@ -167,6 +205,7 @@ export function useImageProcessor() {
         tableStructure,
         grid,
         clues,
+        cellNumbers,
         extractedSymbols,
         uniqueSymbols,
         processedAt: new Date(),

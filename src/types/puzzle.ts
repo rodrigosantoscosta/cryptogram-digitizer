@@ -1,6 +1,6 @@
 // src/types/puzzle.ts
 import type { TableStructure, GridResult } from './image';
-import type { ClueResult } from './ocr';
+import type { ClueResult, CellNumberMap } from './ocr';
 import type { ExtractedSymbol, UniqueSymbol, SymbolMapping } from './symbol';
 import type { GridCell } from './grid';
 
@@ -15,6 +15,7 @@ export interface ProcessedData {
   tableStructure: TableStructure;
   grid: GridResult;
   clues: ClueResult[];
+  cellNumbers: CellNumberMap | null;
   extractedSymbols: ExtractedSymbol[];
   uniqueSymbols: UniqueSymbol[];
   processedAt: Date;

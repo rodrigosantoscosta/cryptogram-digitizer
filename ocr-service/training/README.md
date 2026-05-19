@@ -14,6 +14,60 @@ This directory contains everything needed to train a custom EasyOCR model for re
 
 ## Quick Start
 
+### Pipeline Completo (Fases 2-4)
+
+O pipeline completo extrai células das fotos, gera pseudo-labels e combina com dados sintéticos:
+
+```bash
+# Na raiz do projeto
+./run_pipeline.sh
+```
+
+Isso executa automaticamente:
+1. **Fase 2**: Extrai células das 43 fotos em `samples/`
+2. **Fase 3**: Gera pseudo-labels com EasyOCR
+3. **Fase 4**: Combina células reais com dados sintéticos
+
+**Opções**:
+```bash
+# Rebuild do container antes de executar
+./run_pipeline.sh --rebuild
+
+# Executar apenas uma fase específica
+./run_pipeline.sh --phase 2  # Apenas extração
+./run_pipeline.sh --phase 3  # Apenas pseudo-labeling
+./run_pipeline.sh --phase 4  # Apenas combinação
+```
+
+### Pré-requisitos
+
+- Docker Desktop rodando
+- Container OCR service acessível via `docker-compose.ocr.yml`
+
+### Execução Manual (Fase por Fase)
+
+Se preferir executar cada fase separadamente:
+
+```bash
+# Iniciar o container
+docker compose -f docker-compose.ocr.yml up -d
+
+# Aguardar container ficar saudável
+docker compose -f docker-compose.ocr.yml ps
+
+# Fase 2: Extrair células
+docker compose -f docker-compose.ocr.yml exec ocr-service \
+  python training/batch_extract_cells.py
+
+# Fase 3: Gerar pseudo-labels
+docker compose -f docker-compose.ocr.yml exec ocr-service \
+  python training/generate_pseudo_labels.py
+
+# Fase 4: Combinar datasets
+docker compose -f docker-compose.ocr.yml exec ocr-service \
+  python training/hybrid_dataset.py
+```
+
 ### Option 1: Google Colab (Recommended - Free GPU)
 
 1. **Open Colab Notebook**:
@@ -97,27 +151,45 @@ This directory contains everything needed to train a custom EasyOCR model for re
 
 ```
 ocr-service/training/
+├── grid_detector.py              # Grid detection (Python port do TypeScript)
+├── batch_extract_cells.py        # Fase 2: Extrai células das fotos
+├── generate_pseudo_labels.py     # Fase 3: Pseudo-labeling via EasyOCR
+├── hybrid_dataset.py             # Fase 4: Combina reais + sintéticos
 ├── generate_synthetic_data.py    # Generates 600 samples per digit (1-27)
 ├── train.py                      # Training pipeline orchestrator
 ├── config.yaml                   # EasyOCR training configuration
 ├── cryptogram_digits.py          # Model architecture (None-VGG-BiLSTM-CTC)
 ├── cryptogram_digits.yaml        # Model config for EasyOCR loading
 ├── Dockerfile.train              # Docker image for data generation
+├── README.md                     # This file
 ├── train_data/                   # Generated synthetic data (after running generator)
 │   ├── digit_1_0000.jpg
 │   ├── digit_1_0001.jpg
 │   ├── ...
 │   └── gt.txt                    # Ground truth file
-├── all_data/                     # Split data (after running train.py)
+├── all_data/                     # Hybrid dataset (after running pipeline)
 │   ├── train/
-│   │   ├── *.jpg
+│   │   ├── *.png
 │   │   └── gt.txt
 │   └── val/
-│       ├── *.jpg
+│       ├── *.png
 │       └── gt.txt
 └── saved_models/                 # Pretrained and trained models
     ├── english_g2.pth            # Pretrained model (download)
     └── cryptogram_digits.pth     # Your trained model (output)
+
+# Diretórios de output (na raiz do projeto)
+real_cells/                       # Células extraídas das fotos
+  {foto_name}/
+    cell_r{row}_c{col}.png
+    _grid_overlay.png
+pseudo_labeled/                   # Células com pseudo-labels
+  high/
+    {digit}/
+      cell_0001.png
+  med/
+    {digit}/
+      cell_0001.png
 ```
 
 ---
@@ -275,9 +347,12 @@ curl http://localhost:5000/health
 ## Next Steps
 
 1. ✅ Synthetic data generation script created
-2. ✅ Training configuration prepared
-3. ✅ Model architecture files created
-4. ✅ Integration code updated in ocr_engine.py
-5. ⏳ **Your action**: Run training (Google Colab recommended)
-6. ⏳ **Your action**: Deploy trained model
-7. ⏳ **Your action**: Test and validate accuracy
+2. ✅ GridDetector Python port com correção de perspectiva
+3. ✅ Batch cell extraction script (Fase 2)
+4. ✅ Pseudo-labeling script (Fase 3)
+5. ✅ Hybrid dataset builder (Fase 4)
+6. ✅ Pipeline automation script (`run_pipeline.sh`)
+7. ⏳ **Your action**: Run pipeline (`./run_pipeline.sh`)
+8. ⏳ **Your action**: Run training (Google Colab recommended)
+9. ⏳ **Your action**: Deploy trained model
+10. ⏳ **Your action**: Test and validate accuracy

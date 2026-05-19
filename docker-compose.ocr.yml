@@ -7,6 +7,12 @@ services:
       - "5000:5000"
     volumes:
       - ./ocr-service/models:/app/models
+      - ./ocr-service/training:/app/training
+      - ./samples:/app/samples
+      - ./real_cells:/app/real_cells
+      - ./pseudo_labeled:/app/pseudo_labeled
+      - ./ocr-service/training/all_data:/app/training/all_data
+      - ./ocr-service/training/train_data:/app/training/train_data
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1

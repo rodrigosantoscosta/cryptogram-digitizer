@@ -29,3 +29,9 @@ coverage/
 
 # Contexto legacy
 context/
+
+# Large binary files
+samples.zip
+
+# Serena AI project files
+.serena/

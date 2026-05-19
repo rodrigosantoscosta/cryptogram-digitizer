@@ -45,15 +45,17 @@ function makeMockLinesOut() {
   };
 }
 
-function makeMockMat(opts?: { channels?: number; rows?: number; cols?: number }) {
+function makeMockMat(opts?: { channels?: number; rows?: number; cols?: number; data?: Uint8Array }) {
+  const totalPixels = (opts?.rows ?? 300) * (opts?.cols ?? 300);
   const m: any = {
     channels: () => opts?.channels ?? 1,
     rows: opts?.rows ?? 300,
     cols: opts?.cols ?? 300,
+    data: opts?.data ?? new Uint8Array(totalPixels).fill(128),
     ucharPtr: (_i: number, _j: number) => [128],
     delete: vi.fn(),
     copyTo: vi.fn(),
-    roi: vi.fn(() => makeMockMat()),  // used by detectByMorphology
+    roi: vi.fn(() => makeMockMat(opts)),  // used by detectByMorphology
   };
   return m;
 }
@@ -128,7 +130,7 @@ describe('GridDetector — detectByHoughIntersection (via detect())', () => {
       const mock = makeMockLinesOut();
       out.rows = mock.rows; out.data32S = mock.data32S; out.delete = mock.delete;
     });
-    cvMock.Mat.mockImplementation(() => makeMockMat());
+    cvMock.Mat.mockImplementation(() => makeMockMat({ rows: 300, cols: 300 }));
     cvMock.matFromImageData.mockImplementation(() =>
       makeMockMat({ channels: 4, rows: 300, cols: 300 })
     );

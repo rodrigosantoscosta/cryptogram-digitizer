@@ -118,7 +118,7 @@ export class SymbolMapper {
   static importMapping(json: string): SymbolMapping {
     try {
       const parsed = JSON.parse(json);
-      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         throw new Error('Formato inválido');
       }
       return parsed as SymbolMapping;

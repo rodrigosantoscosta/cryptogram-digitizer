@@ -32,7 +32,7 @@ vi.mock('./components/CryptogramSolver', async (importOriginal) => {
 describe('App', () => {
   it('renderiza sem erros', () => {
     render(<App />);
-    expect(document.body).toBeTruthy();
+    expect(screen.getByText('Carregar Criptograma')).toBeInTheDocument();
   });
 
   it('mostra a tela inicial de upload', () => {

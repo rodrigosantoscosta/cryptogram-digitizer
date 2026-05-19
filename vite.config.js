@@ -17,6 +17,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/testing/setup-tests.ts'],
     css: false,
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'tests/**', // Excluir testes Playwright (E2E) no root
+      'src/tests/unit/ImageProcessor.test.ts', // Requer OpenCV real (não roda em jsdom)
+    ],
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

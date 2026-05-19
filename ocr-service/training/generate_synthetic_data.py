@@ -31,37 +31,22 @@ IMAGE_WIDTH = 200
 # Digits to generate (1-27)
 DIGITS = list(range(1, 28))
 
-# Fonts to use (Windows fonts)
+# Fonts to use (Linux fonts - DejaVu and Liberation)
 FONT_PATHS = [
-    'C:/Windows/Fonts/arial.ttf',
-    'C:/Windows/Fonts/arialbd.ttf',
-    'C:/Windows/Fonts/arialbi.ttf',
-    'C:/Windows/Fonts/ariali.ttf',
-    'C:/Windows/Fonts/times.ttf',
-    'C:/Windows/Fonts/timesbd.ttf',
-    'C:/Windows/Fonts/timesbi.ttf',
-    'C:/Windows/Fonts/timesi.ttf',
-    'C:/Windows/Fonts/cour.ttf',
-    'C:/Windows/Fonts/courbd.ttf',
-    'C:/Windows/Fonts/courbi.ttf',
-    'C:/Windows/Fonts/couri.ttf',
-    'C:/Windows/Fonts/verdana.ttf',
-    'C:/Windows/Fonts/verdanab.ttf',
-    'C:/Windows/Fonts/verdanai.ttf',
-    'C:/Windows/Fonts/verdanaz.ttf',
-    'C:/Windows/Fonts/georgia.ttf',
-    'C:/Windows/Fonts/georgiab.ttf',
-    'C:/Windows/Fonts/georgiai.ttf',
-    'C:/Windows/Fonts/georgiaz.ttf',
-    'C:/Windows/Fonts/impact.ttf',
-    'C:/Windows/Fonts/comic.ttf',
-    'C:/Windows/Fonts/comicbd.ttf',
-    'C:/Windows/Fonts/tahoma.ttf',
-    'C:/Windows/Fonts/tahomabd.ttf',
-    'C:/Windows/Fonts/trebuc.ttf',
-    'C:/Windows/Fonts/trebucbd.ttf',
-    'C:/Windows/Fonts/trebucbi.ttf',
-    'C:/Windows/Fonts/trebucit.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-BoldItalic.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf',
 ]
 
 # Filter fonts that exist

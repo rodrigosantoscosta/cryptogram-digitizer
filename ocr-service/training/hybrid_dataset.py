@@ -281,9 +281,17 @@ def main() -> None:
     # 4. Gerar output
     print(f"[4/4] Writing dataset to {output_dir}...")
 
-    # Limpar output anterior se existir
+    # Limpar output anterior se existir (handle mounted volumes)
     if output_dir.exists():
-        shutil.rmtree(output_dir)
+        try:
+            shutil.rmtree(output_dir)
+        except OSError:
+            # Mounted volume - clean contents instead
+            for item in output_dir.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item, ignore_errors=True)
+                else:
+                    item.unlink()
 
     train_dir = output_dir / "train"
     val_dir = output_dir / "val"

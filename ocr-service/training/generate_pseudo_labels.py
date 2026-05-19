@@ -126,30 +126,26 @@ def get_strategies() -> list[tuple[str, callable]]:
 
 # ─── OCR Recognition ───────────────────────────────────────────────────────────
 
-def sanitize_number(text: str) -> int | None:
+def sanitize_number(text: str) -> tuple[int | None, str]:
     """
     Sanitiza texto extraído para extrair apenas números válidos (1-27).
+    
+    Returns:
+        (number, raw_digits) - raw_digits é a string de dígitos extraída para validação
     """
     import re
     cleaned = re.sub(r'[^0-9]', '', text)
     if not cleaned:
-        return None
+        return None, ""
     if len(cleaned) > 2:
         cleaned = cleaned[:2]
     try:
         number = int(cleaned)
     except ValueError:
-        return None
+        return None, cleaned
     if number < 1 or number > 27:
-        if len(cleaned) == 2:
-            first = int(cleaned[0])
-            if 1 <= first <= 27:
-                return first
-            second = int(cleaned[1])
-            if 1 <= second <= 27:
-                return second
-        return None
-    return number
+        return None, cleaned
+    return number, cleaned
 
 
 def recognize_cell(image: np.ndarray) -> dict:
@@ -162,6 +158,7 @@ def recognize_cell(image: np.ndarray) -> dict:
         "number": None,
         "confidence": 0.0,
         "rawText": "",
+        "rawDigits": "",
         "strategy": ""
     }
 
@@ -180,13 +177,14 @@ def recognize_cell(image: np.ndarray) -> dict:
             if results:
                 best = max(results, key=lambda x: x[2])
                 text, confidence = best[1], best[2]
-                number = sanitize_number(text)
+                number, raw_digits = sanitize_number(text)
 
                 if number is not None and confidence > best_result["confidence"]:
                     best_result = {
                         "number": number,
                         "confidence": float(confidence),
                         "rawText": text,
+                        "rawDigits": raw_digits,
                         "strategy": strategy_name,
                     }
 
@@ -265,6 +263,43 @@ def augment_cell(image: np.ndarray, rng: random.Random) -> np.ndarray:
     return result
 
 
+# ─── Validação de Consistência ────────────────────────────────────────────────
+
+def validate_digit_consistency(image: np.ndarray, recognized_number: int, raw_digits: str) -> tuple[bool, str]:
+    """
+    Valida se o número reconhecido é consistente com a célula original.
+    
+    Critérios:
+      1. rawDigits length vs número de dígitos esperados
+      2. Aspect ratio da célula original
+    
+    Returns:
+        (is_valid, reason) - reason é "" se válida, descrição se inválida
+    """
+    h, w = image.shape[:2]
+    ar = w / h
+    
+    expected_digits = len(str(recognized_number))
+    actual_digits = len(raw_digits)
+    
+    # Validação 1: rawDigits length mismatch
+    if actual_digits != expected_digits:
+        return False, f"digit_count_mismatch(expected={expected_digits}, got={actual_digits}, rawDigits='{raw_digits}')"
+    
+    # Validação 2: Aspect ratio consistency
+    # Células com 2 dígitos tendem a ser mais largas que células com 1 dígito
+    if recognized_number < 10:
+        # Espera célula mais estreita (1 dígito)
+        if ar > 1.3:
+            return False, f"aspect_ratio_mismatch(number={recognized_number}, AR={ar:.2f}, expected<1.3)"
+    else:
+        # Espera célula mais larga (2 dígitos)
+        if ar < 0.85:
+            return False, f"aspect_ratio_mismatch(number={recognized_number}, AR={ar:.2f}, expected>0.85)"
+    
+    return True, ""
+
+
 # ─── Processamento ────────────────────────────────────────────────────────────
 
 def process_cell(
@@ -285,6 +320,7 @@ def process_cell(
         "number": None,
         "confidence": 0.0,
         "rawText": "",
+        "rawDigits": "",
         "strategy": "",
         "tier": None,
         "augmentations": 0,
@@ -308,7 +344,15 @@ def process_cell(
         stats["number"] = result["number"]
         stats["confidence"] = result["confidence"]
         stats["rawText"] = result["rawText"]
+        stats["rawDigits"] = result["rawDigits"]
         stats["strategy"] = result["strategy"]
+
+        # Validação de consistência
+        is_valid, reason = validate_digit_consistency(image, result["number"], result["rawDigits"])
+        if not is_valid:
+            stats["status"] = "rejected"
+            stats["error"] = reason
+            return stats
 
         # Filtro por confiança
         conf = result["confidence"]

@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { CellNumberMap, CellNumber } from '@/lib/ocr/CellNumberReader';
-import type { GridResult } from '@/types';
+import type { GridResult } from '@/types/image';
 
 // ─── Re-implementação local (funções não exportadas) ──────────────────────────
 

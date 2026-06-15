@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import App from './App';
 
@@ -30,18 +30,24 @@ vi.mock('./components/CryptogramSolver', async (importOriginal) => {
 });
 
 describe('App', () => {
-  it('renderiza sem erros', () => {
+  it('renderiza sem erros', async () => {
     render(<App />);
-    expect(screen.getByText('Carregar Criptograma')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Carregar Criptograma')).toBeInTheDocument();
+    });
   });
 
-  it('mostra a tela inicial de upload', () => {
+  it('mostra a tela inicial de upload', async () => {
     render(<App />);
-    expect(screen.getByText('Carregar Criptograma')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Carregar Criptograma')).toBeInTheDocument();
+    });
   });
 
-  it('mostra dicas de upload na tela inicial', () => {
+  it('mostra dicas de upload na tela inicial', async () => {
     render(<App />);
-    expect(screen.getByText('Dicas para melhor resultado')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Dicas para melhor resultado')).toBeInTheDocument();
+    });
   });
 });

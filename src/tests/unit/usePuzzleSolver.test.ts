@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { GridCell, SymbolMapping } from '@/types';
+import type { GridCell } from '@/types/grid';
+import type { SymbolMapping } from '@/types/symbol';
 import { SymbolMapper } from '@/lib/image-processing/SymbolMapper';
 
 // ─── Re-implementação da lógica do hook (sem React) ──────────────────────────

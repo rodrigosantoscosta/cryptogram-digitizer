@@ -76,7 +76,11 @@ export class OCRApiClient {
     return data.results;
   }
 
-  async recognizeAllCells(cells: CellImageInput[], onProgress?: (progress: number) => void): Promise<OCRResult[]> {
+  async recognizeAllCells(
+    cells: CellImageInput[],
+    onProgress?: (progress: number) => void,
+    shouldAbort?: (resultsSoFar: OCRResult[], progress: number) => boolean
+  ): Promise<OCRResult[]> {
     const allResults: OCRResult[] = [];
     const total = cells.length;
 
@@ -85,8 +89,15 @@ export class OCRApiClient {
       const results = await this.recognizeBatch(chunk);
       allResults.push(...results);
 
+      const progress = Math.min((i + chunk.length) / total, 1);
+
       if (onProgress) {
-        onProgress(Math.min((i + chunk.length) / total, 1));
+        onProgress(progress);
+      }
+
+      if (shouldAbort && shouldAbort(allResults, progress)) {
+        console.log(`[OCRApiClient] Early abort at ${(progress * 100).toFixed(1)}% progress`);
+        break;
       }
     }
 

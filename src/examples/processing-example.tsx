@@ -1,7 +1,9 @@
 // src/examples/processing-example.tsx
 import { useState } from 'react';
-import { ImageProcessor, TableDetector, SymbolExtractor } from '../lib';
-import type { ProcessedData } from '../types';
+import { ImageProcessor } from '@/lib/image-processing/ImageProcessor';
+import { TableDetector } from '@/lib/image-processing/TableDetector';
+import { SymbolExtractor } from '@/lib/image-processing/SymbolExtractor';
+import type { ProcessedData } from '@/types/puzzle';
 
 export function ProcessingExample() {
   const [imageData, setImageData] = useState<ImageData | null>(null);

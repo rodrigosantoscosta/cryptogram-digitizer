@@ -1,17 +1,20 @@
 import { useState } from 'react';
+import { Hash, AlertTriangle, CheckCircle, Gamepad2, Download, RotateCcw, SearchX } from 'lucide-react';
 import { useSymbolMapping } from '../hooks/useSymbolMapping';
 import { SymbolMapperUI } from '../components/Mapping/SymbolMapperUI';
 import { CellNumberOverlay } from '../components/CellNumberOverlay';
-import type { ProcessedData } from '../types/index';
+import type { ProcessedData } from '@/types/puzzle';
 import type { SymbolMapping } from '../types/symbol';
 
 interface Props {
   processedData: ProcessedData;
   onRestart: () => void;
   onSolve?: (mapping: SymbolMapping) => void;
+  puzzleId?: string;
+  originalImage?: ImageData;
 }
 
-export function StepMapping({ processedData, onRestart, onSolve }: Props) {
+export function StepMapping({ processedData, onRestart, onSolve, puzzleId = 'puzzle', originalImage }: Props) {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const {
@@ -36,39 +39,44 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
   };
 
   return (
-    <div style={s.container}>
-      <h1 style={s.title}>Mapeamento de Símbolos</h1>
+    <div className="max-w-5xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6 text-ink">Mapeamento de Símbolos</h1>
 
       {/* Barra de progresso */}
-      <div style={s.progressCard}>
-        <div style={s.progressHeader}>
+      <div className="bg-surface-card border border-border-light rounded-card p-5 mb-4">
+        <div className="flex justify-between items-center mb-3 text-sm text-ink-muted">
           <span>Progresso do mapeamento</span>
-          <strong style={s.progressValue}>{progress.toFixed(0)}%</strong>
+          <strong className="text-xl text-primary">{progress.toFixed(0)}%</strong>
         </div>
-        <div style={s.progressBar}>
-          <div style={{ ...s.progressFill, width: `${progress}%` }} />
+        <div className="w-full h-2 bg-border rounded-full overflow-hidden">
+          <div className="h-full bg-primary transition-all duration-300 ease-in-out" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
       {/* Banner de detecção numérica */}
       {hasNumbers && (
-        <div style={{ ...s.infoBanner, ...(coverage >= 70 ? s.infoBannerGood : s.infoBannerWarn) }}>
-          <div style={s.infoBannerLeft}>
-            <span style={s.infoBannerIcon}>{coverage >= 70 ? '🔢' : '⚠️'}</span>
+        <div className={`
+          flex items-center justify-between gap-4 rounded-input p-3.5 mb-4 flex-wrap
+          ${coverage >= 70 ? 'bg-emerald-50 border border-emerald-300' : 'bg-amber-50 border border-amber-200'}
+        `}>
+          <div className="flex items-start gap-3 flex-1">
+            <span className="text-xl leading-none mt-0.5">
+              {coverage >= 70 ? <Hash size={22} /> : <AlertTriangle size={22} />}
+            </span>
             <div>
               <strong>
                 {coverage >= 70
                   ? `Números detectados — modo numérico ativo (${coverage}% de cobertura)`
                   : `Detecção parcial de números (${coverage}% de cobertura) — usando pHash visual`}
               </strong>
-              <p style={s.infoBannerSub}>
+              <p className="text-xs text-ink-muted mt-1 mb-0">
                 {cellNumbers.recognized} de {cellNumbers.total} células reconhecidas
                 · {Object.keys(cellNumbers.bySymbol).length} símbolos únicos
               </p>
             </div>
           </div>
           <button
-            style={s.diagBtn}
+            className="px-3.5 py-1.5 bg-surface-card border border-border rounded-md text-sm cursor-pointer whitespace-nowrap font-medium hover:bg-surface-subtle transition-colors"
             onClick={() => setShowDiagnostics(!showDiagnostics)}
           >
             {showDiagnostics ? 'Ocultar diagnóstico' : 'Ver diagnóstico'}
@@ -78,10 +86,13 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
 
       {/* Painel de diagnóstico */}
       {showDiagnostics && hasNumbers && (
-        <div style={s.diagPanel}>
+        <div className="bg-slate-50 border border-slate-200 rounded-card p-5 mb-5">
           <CellNumberOverlay
             cellNumbers={cellNumbers}
             grid={grid}
+            backgroundImage={originalImage}
+            imagePosition="side"
+            puzzleId={puzzleId}
           />
         </div>
       )}
@@ -89,12 +100,14 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
       {processedData.uniqueSymbols.length > 0 ? (
         <>
           {validation.isValid && (
-            <div style={s.successBanner}>✅ Mapeamento completo e válido!</div>
+            <div className="bg-success-bg border border-success-border rounded-input p-4 mb-6 text-success-text text-base font-medium flex items-center">
+              <CheckCircle size={18} className="mr-1.5 flex-shrink-0" />Mapeamento completo e válido!
+            </div>
           )}
           {validation.errors.length > 0 && (
-            <div style={s.errorBanner}>
+            <div className="bg-error-bg border border-error-border rounded-input p-4 mb-6 text-error-text">
               <strong>Problemas encontrados</strong>
-              <ul style={s.errorList}>
+              <ul className="mt-2 pl-5">
                 {validation.errors.map((error: string) => <li key={error}>{error}</li>)}
               </ul>
             </div>
@@ -108,64 +121,42 @@ export function StepMapping({ processedData, onRestart, onSolve }: Props) {
             onApplyAutoMapping={() => applyAutoMapping(0.7)}
           />
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
+          <div className="flex gap-3 mt-6 flex-wrap">
             {onSolve && (
               <button
-                style={s.solveBtn}
+                className="px-6 py-3 bg-emerald-500 text-white border-none rounded-input text-sm font-semibold cursor-pointer hover:bg-emerald-600 transition-colors flex items-center"
                 onClick={() => onSolve(mapping)}
               >
-                🎮 Jogar Criptograma
+                <Gamepad2 size={16} className="mr-1.5" />Jogar Criptograma
               </button>
             )}
-            <button style={s.exportBtn} onClick={handleExport}>
-              💾 Exportar JSON
+            <button
+              className="px-6 py-3 bg-primary text-white border-none rounded-input text-sm font-semibold cursor-pointer hover:bg-primary-hover transition-colors flex items-center"
+              onClick={handleExport}
+            >
+              <Download size={16} className="mr-1.5" />Exportar JSON
             </button>
-            <button style={s.restartBtn} onClick={onRestart}>
-              🔄 Novo Upload
+            <button
+              className="px-6 py-3 bg-surface-card text-primary border-2 border-primary rounded-input text-sm font-semibold cursor-pointer hover:bg-primary-active transition-colors flex items-center"
+              onClick={onRestart}
+            >
+              <RotateCcw size={16} className="mr-1.5" />Novo Upload
             </button>
           </div>
         </>
       ) : (
-        <div style={s.emptyState}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>🔍</div>
-          <h2 style={s.emptyTitle}>Nenhum símbolo para mapear</h2>
-          <p style={s.emptyText}>Faça upload e processamento de um criptograma primeiro</p>
-          <button style={s.exportBtn} onClick={onRestart}>Ir para Upload</button>
+        <div className="text-center py-20 px-5">
+          <SearchX size={64} className="mx-auto mb-4 text-ink-faint" />
+          <h2 className="text-2xl font-semibold text-ink mb-2">Nenhum símbolo para mapear</h2>
+          <p className="text-base text-ink-muted mb-6">Faça upload e processamento de um criptograma primeiro</p>
+          <button
+            className="px-6 py-3 bg-primary text-white border-none rounded-input text-sm font-semibold cursor-pointer hover:bg-primary-hover transition-colors"
+            onClick={onRestart}
+          >
+            Ir para Upload
+          </button>
         </div>
       )}
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  container:      { maxWidth: 1200, margin: '0 auto' },
-  title:          { fontSize: 32, fontWeight: 'bold', marginBottom: 24, color: '#1a1a1a' },
-
-  progressCard:   { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: 12, padding: 20, marginBottom: 16 },
-  progressHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, fontSize: 14, color: '#666' },
-  progressValue:  { fontSize: 20, color: '#667eea' },
-  progressBar:    { width: '100%', height: 8, backgroundColor: '#e0e0e0', borderRadius: 4, overflow: 'hidden' },
-  progressFill:   { height: '100%', backgroundColor: '#667eea', transition: 'width 0.3s ease' },
-
-  infoBanner:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, borderRadius: 10, padding: '14px 18px', marginBottom: 16, flexWrap: 'wrap' },
-  infoBannerGood: { background: '#f0fdf4', border: '1px solid #86efac' },
-  infoBannerWarn: { background: '#fffbeb', border: '1px solid #fde68a' },
-  infoBannerLeft: { display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1 },
-  infoBannerIcon: { fontSize: 22, lineHeight: 1, marginTop: 2 },
-  infoBannerSub:  { fontSize: 12, color: '#6b7280', marginTop: 3, marginBottom: 0 },
-  diagBtn:        { padding: '6px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 },
-
-  diagPanel:      { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 20 },
-
-  successBanner:  { backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: 8, padding: 16, marginBottom: 24, color: '#155724', fontSize: 16, fontWeight: 500 },
-  errorBanner:    { backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: 8, padding: 16, marginBottom: 24, color: '#721c24' },
-  errorList:      { margin: '8px 0 0 0', paddingLeft: 20 },
-
-  emptyState:     { textAlign: 'center', padding: '80px 20px' },
-  emptyTitle:     { fontSize: 24, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
-  emptyText:      { fontSize: 16, color: '#666', marginBottom: 24 },
-
-  solveBtn:       { padding: '12px 24px', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  exportBtn:      { padding: '12px 24px', backgroundColor: '#667eea', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  restartBtn:     { padding: '12px 24px', backgroundColor: '#fff', color: '#667eea', border: '2px solid #667eea', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-};

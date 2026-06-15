@@ -1,6 +1,8 @@
 // src/pages/UploadPage.tsx
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Camera, FolderOpen, X, Rocket, Loader2, Lightbulb, AlertTriangle } from 'lucide-react';
+import { useImageStore } from '@/store/useImageStore';
 
 export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -9,6 +11,7 @@ export function UploadPage() {
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const setImageData = useImageStore((s) => s.setImageData);
 
   const handleFileSelect = (selectedFile: File) => {
     if (!selectedFile.type.startsWith('image/')) {
@@ -18,7 +21,6 @@ export function UploadPage() {
 
     setFile(selectedFile);
 
-    // Criar preview
     const reader = new FileReader();
     reader.onload = (e) => {
       setPreview(e.target?.result as string);
@@ -53,28 +55,31 @@ export function UploadPage() {
   };
 
   const handleProcess = async () => {
-    if (!file) return;
+    if (!file || !preview) return;
 
     setIsLoading(true);
 
     try {
-      // ✅ CORREÇÃO: Salvar apenas o preview (base64) ao invés de ImageData
-      sessionStorage.setItem('uploadedImagePreview', preview);
-      sessionStorage.setItem('uploadedImageName', file.name);
+      const img = new Image();
+      img.src = preview;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+      });
 
-      // Navegar para página de processamento
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Não foi possível criar contexto 2D');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      setImageData(imageData);
       navigate('/processing');
     } catch (error) {
       console.error('Erro ao processar imagem:', error);
-
-      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-        alert(
-          'Imagem muito grande para o armazenamento local.\n' +
-          'Tente usar uma imagem menor ou com menor resolução.'
-        );
-      } else {
-        alert('Erro ao processar a imagem. Tente novamente.');
-      }
+      alert('Erro ao processar a imagem. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -89,18 +94,20 @@ export function UploadPage() {
   };
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>📸 Carregar Criptograma</h1>
-      <p style={styles.subtitle}>
+    <div className="max-w-3xl mx-auto py-10 px-5 font-sans">
+      <h1 className="text-3xl font-bold mb-2 text-ink flex items-center">
+        <Camera size={28} className="mr-2" />Carregar Criptograma
+      </h1>
+      <p className="text-base text-ink-muted mb-8">
         Faça upload de uma foto do criptograma para começar o processamento
       </p>
 
       {!preview ? (
         <div
-          style={{
-            ...styles.dropZone,
-            ...(isDragging ? styles.dropZoneActive : {}),
-          }}
+          className={`
+            border-2 border-dashed rounded-card p-14 text-center cursor-pointer transition-all duration-200
+            ${isDragging ? 'border-primary bg-primary-active' : 'border-border bg-surface-page'}
+          `}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -115,42 +122,43 @@ export function UploadPage() {
           role="button"
           aria-label="Clique ou arraste uma imagem aqui para fazer upload"
         >
-          <div style={styles.dropZoneContent}>
-            <div style={styles.icon}>📁</div>
-            <p style={styles.dropZoneText}>
-              Arraste uma imagem aqui ou clique para selecionar
-            </p>
-            <p style={styles.dropZoneHint}>
-              Formatos suportados: JPG, PNG, JPEG
-            </p>
-          </div>
+          <FolderOpen size={64} className="mx-auto mb-4 text-ink-faint" />
+          <p className="text-lg text-ink font-medium mb-2">
+            Arraste uma imagem aqui ou clique para selecionar
+          </p>
+          <p className="text-sm text-ink-faint">
+            Formatos suportados: JPG, PNG, JPEG
+          </p>
 
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={handleFileInputChange}
-            style={styles.hiddenInput}
+            className="hidden"
           />
         </div>
       ) : (
-        <div style={styles.previewContainer}>
-          <div style={styles.previewHeader}>
-            <h3 style={styles.previewTitle}>Preview da Imagem</h3>
-            <button onClick={handleClear} style={styles.clearButton}>
-              ✕ Remover
+        <div className="bg-surface-card border border-border-light rounded-card p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-ink">Preview da Imagem</h3>
+            <button
+              onClick={handleClear}
+              className="bg-none border-none text-error text-sm cursor-pointer px-3 py-2 rounded-input hover:bg-error/10 transition-colors"
+            >
+              <X size={14} className="inline mr-1" />Remover
             </button>
           </div>
 
-          <div style={styles.imageWrapper}>
-            <img src={preview} alt="Preview" style={styles.previewImage} />
+          <div className="mb-4 rounded-input overflow-hidden border border-border">
+            <img src={preview} alt="Preview" className="w-full h-auto block" />
           </div>
 
-          <div style={styles.fileInfo}>
-            <p style={styles.fileName}>
+          <div className="bg-surface-subtle p-3 rounded-input mb-4">
+            <p className="text-sm text-ink mb-1">
               <strong>Arquivo:</strong> {file?.name}
             </p>
-            <p style={styles.fileSize}>
+            <p className="text-sm text-ink-muted">
               <strong>Tamanho:</strong> {formatFileSize(file?.size || 0)}
             </p>
           </div>
@@ -158,25 +166,37 @@ export function UploadPage() {
           <button
             onClick={handleProcess}
             disabled={isLoading}
-            style={{
-              ...styles.processButton,
-              ...(isLoading ? styles.processButtonDisabled : {}),
-            }}
+            className={`
+              w-full py-4 text-base font-semibold text-white rounded-input transition-all duration-200
+              flex items-center justify-center
+              ${isLoading
+                ? 'bg-ink-faint cursor-not-allowed'
+                : 'bg-primary hover:bg-primary-hover active:bg-primary-hover'}
+            `}
           >
-            {isLoading ? '⏳ Processando...' : '🚀 Processar Criptograma'}
+            {isLoading
+              ? <><Loader2 size={18} className="mr-2 animate-spin" />Processando...</>
+              : <><Rocket size={18} className="mr-2" />Processar Criptograma</>
+            }
           </button>
         </div>
       )}
 
-      <div style={styles.tips}>
-        <h3 style={styles.tipsTitle}>💡 Dicas para Melhor Resultado</h3>
-        <ul style={styles.tipsList}>
+      <div className="bg-surface-subtle p-6 rounded-card border border-border-light">
+        <h3 className="text-lg font-semibold text-ink mb-3 flex items-center">
+          <Lightbulb size={18} className="mr-2" />Dicas para Melhor Resultado
+        </h3>
+        <ul className="text-sm text-ink-muted leading-relaxed pl-5 m-0 space-y-0.5">
           <li>Use boa iluminação ao fotografar</li>
           <li>Mantenha a câmera paralela ao criptograma</li>
           <li>Evite sombras e reflexos</li>
           <li>Capture toda a grade do criptograma</li>
           <li>Imagens com boa resolução funcionam melhor</li>
-          <li><strong>⚠️ Prefira imagens com menos de 2MB</strong></li>
+          <li>
+            <strong className="flex items-center gap-1">
+              <AlertTriangle size={14} />Prefira imagens com menos de 2MB
+            </strong>
+          </li>
         </ul>
       </div>
     </div>
@@ -190,30 +210,3 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: { maxWidth: '800px', margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui, -apple-system, sans-serif' },
-  title: { fontSize: '32px', fontWeight: 'bold', marginBottom: '8px', color: '#1a1a1a' },
-  subtitle: { fontSize: '16px', color: '#666', marginBottom: '32px' },
-  dropZone: { border: '3px dashed #ccc', borderRadius: '12px', padding: '60px 20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', backgroundColor: '#fafafa', marginBottom: '32px' },
-  dropZoneActive: { borderColor: '#667eea', backgroundColor: '#f0f4ff' },
-  dropZoneContent: { pointerEvents: 'none' },
-  icon: { fontSize: '64px', marginBottom: '16px' },
-  dropZoneText: { fontSize: '18px', color: '#333', marginBottom: '8px', fontWeight: '500' },
-  dropZoneHint: { fontSize: '14px', color: '#999' },
-  hiddenInput: { display: 'none' },
-  previewContainer: { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '24px', marginBottom: '32px' },
-  previewHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' },
-  previewTitle: { fontSize: '18px', fontWeight: '600', color: '#1a1a1a', margin: 0 },
-  clearButton: { background: 'none', border: 'none', color: '#dc3545', fontSize: '14px', cursor: 'pointer', padding: '8px 12px', borderRadius: '6px', transition: 'background 0.2s' },
-  imageWrapper: { marginBottom: '16px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0' },
-  previewImage: { width: '100%', height: 'auto', display: 'block' },
-  fileInfo: { backgroundColor: '#f8f9fa', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px' },
-  fileName: { fontSize: '14px', color: '#333', margin: '4px 0' },
-  fileSize: { fontSize: '14px', color: '#666', margin: '4px 0' },
-  processButton: { width: '100%', padding: '16px 24px', fontSize: '16px', fontWeight: '600', color: '#fff', backgroundColor: '#667eea', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.3s' },
-  processButtonDisabled: { backgroundColor: '#ccc', cursor: 'not-allowed' },
-  tips: { backgroundColor: '#f8f9fa', padding: '24px', borderRadius: '12px', border: '1px solid #e0e0e0' },
-  tipsTitle: { fontSize: '18px', fontWeight: '600', color: '#1a1a1a', marginBottom: '12px' },
-  tipsList: { fontSize: '14px', color: '#666', lineHeight: '1.8', paddingLeft: '20px', margin: 0 },
-};

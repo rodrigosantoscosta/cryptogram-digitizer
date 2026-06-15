@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CluePanel } from '@/components/CluePanel/CluePanel';
-import type { ClueResult } from '@/types';
+import type { ClueResult } from '@/types/ocr';
 
 function makeClue(row: number, text: string, confidence: number): ClueResult {
   return { row, text, confidence, rawText: text };

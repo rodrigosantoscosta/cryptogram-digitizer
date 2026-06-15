@@ -15,31 +15,13 @@
  *  - Batch processing reduz latência (16 células por request)
  */
 
-import type { GridResult } from '@/types';
+import type { GridResult } from '@/types/image';
+import type { CellNumber, CellNumberMap } from '@/types/ocr';
 import { OCRApiClient } from './OCRApiClient';
 
 declare const cv: any;
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-export interface CellNumber {
-  row: number;
-  col: number;
-  number: number | null;   // null = célula vazia ou não reconhecida
-  confidence: number;      // 0–1
-  rawText: string;         // pós-sanitizeDigits
-  rawOcr: string;          // pré-sanitizeDigits (saída literal do Tesseract)
-}
-
-export interface CellNumberMap {
-  cells: CellNumber[];
-  /** symbolId (número como string) → lista de posições */
-  bySymbol: Record<string, Array<{ row: number; col: number }>>;
-  /** total de células com número reconhecido */
-  recognized: number;
-  /** total de células tentadas */
-  total: number;
-}
+export type { CellNumber, CellNumberMap };
 
 // ─── Sanitização de dígitos ───────────────────────────────────────────────────
 
@@ -392,22 +374,6 @@ export class CellNumberReader {
   private apiClient: OCRApiClient;
   private templates: Template[] = [];
   
-  // Fix 4.2: Posições conhecidas para valores especiais
-  // 27 aparece apenas uma vez no criptograma (row 8, col 2)
-  private readonly KNOWN_POSITIONS: Record<number, Array<[number, number]>> = {
-    27: [[8, 2]]
-  };
-
-  // Accuracy Improvement Plan: Unique value positions
-  private readonly UNIQUE_VALUE_POSITIONS: Record<number, Array<[number, number]>> = {
-    22: [[6, 0]],
-    27: [[8, 2]],
-    1: [[0, 0]],
-    6: [[5, 5]],
-    8: [[1, 7], [2, 6]],
-  };
-
-  // Accuracy Improvement Plan: Known confusion pairs
   private readonly CONFUSION_PAIRS: Record<number, number[]> = {
     13: [7, 1, 3],
     7: [13, 1, 4],
@@ -417,29 +383,6 @@ export class CellNumberReader {
     4: [1, 14, 17],
     3: [4, 8, 13],
   };
-
-  // Ground truth: exact expected frequencies from ocr-ground-truth.json
-  private readonly EXACT_GROUND_TRUTH: Record<number, number> = {
-    26: 18, 2: 10, 3: 9, 13: 8, 12: 6, 19: 6,
-    7: 5, 10: 5, 1: 4, 4: 4, 17: 4, 14: 3,
-    16: 3, 11: 2, 18: 2, 5: 2, 6: 1, 8: 1, 22: 1, 27: 1
-  };
-
-  // Ground truth: complete 12x8 grid for position-specific validation
-  private readonly GROUND_TRUTH_GRID: number[][] = [
-    [1, 26, 12, 3, 10, 26, 2, 13],
-    [13, 1, 19, 14, 26, 12, 18, 3],
-    [11, 26, 16, 26, 1, 19, 8, 26],
-    [14, 13, 19, 17, 26, 5, 3, 11],
-    [10, 7, 12, 5, 19, 26, 2, 13],
-    [3, 17, 14, 7, 12, 6, 26, 10],
-    [22, 7, 10, 13, 4, 13, 12, 3],
-    [7, 16, 13, 12, 7, 1, 26, 17],
-    [2, 19, 27, 10, 26, 2, 13, 17],
-    [26, 4, 19, 5, 3, 12, 18, 3],
-    [2, 3, 1, 13, 10, 26, 2, 26],
-    [3, 1, 13, 17, 4, 3, 16, 26],
-  ];
 
   constructor(apiUrl?: string) {
     this.apiClient = new OCRApiClient(apiUrl);
@@ -484,77 +427,6 @@ export class CellNumberReader {
     if (isDifferent) {
       this.templates.push({ imageData: rawCell, number });
     }
-  }
-
-  /**
-   * Fix 4.2: Validação de posições conhecidas
-   * 27 aparece apenas em (8,2). Se OCR lê 27 em outra posição, é erro.
-   * Também valida valores únicos que aparecem apenas uma vez.
-   */
-  private validateKnownPositions(
-    row: number,
-    col: number,
-    value: number,
-    rawCell: ImageData
-  ): number | null {
-    const knownPositions = this.KNOWN_POSITIONS[value];
-    
-    if (knownPositions) {
-      const isKnownPosition = knownPositions.some(
-        ([r, c]) => r === row && c === col
-      );
-      
-      if (!isKnownPosition) {
-        console.log(`[OCR] Known position: ${value} at (${row},${col}) is unexpected`);
-        
-        // Try all available templates for alternatives
-        if (this.templates.length > 0) {
-          const match = matchTemplate(rawCell, this.templates);
-          if (match) {
-            console.log(`[OCR] Corrected to ${match.number} based on known positions`);
-            return match.number;
-          }
-        }
-        
-        return null;
-      }
-    }
-    
-    return value;
-  }
-
-  /**
-   * Accuracy Improvement Plan: Validate unique value positions
-   * Values that appear only once in the cryptogram must be at their expected positions.
-   */
-  private validateUniqueValuePositions(
-    row: number,
-    col: number,
-    value: number,
-    rawCell: ImageData
-  ): number | null {
-    const expectedPositions = this.UNIQUE_VALUE_POSITIONS[value];
-    
-    if (expectedPositions) {
-      const isExpected = expectedPositions.some(([r, c]) => r === row && c === col);
-      
-      if (!isExpected) {
-        console.log(`[OCR] Unique value validation: ${value} at (${row},${col}) is unexpected`);
-        
-        // Try template matching for alternatives
-        if (this.templates.length > 0) {
-          const match = matchTemplate(rawCell, this.templates);
-          if (match) {
-            console.log(`[OCR] Corrected unique value to ${match.number}`);
-            return match.number;
-          }
-        }
-        
-        return null;
-      }
-    }
-    
-    return value;
   }
 
   /**
@@ -648,114 +520,6 @@ export class CellNumberReader {
   }
 
   /**
-   * Ground Truth-Guided Frequency Correction
-   * Uses exact expected frequencies from ground truth to correct anomalies.
-   */
-  private correctByGroundTruthFrequency(
-    cells: CellNumber[],
-    rawCells: Map<string, ImageData>
-  ): void {
-    const frequency = buildFrequencyMap(cells);
-    
-    // Find values that are over-represented vs ground truth
-    const overRepresented: { value: number; excess: number }[] = [];
-    const underRepresented: number[] = [];
-    
-    for (const [expectedValue, expectedCount] of Object.entries(this.EXACT_GROUND_TRUTH)) {
-      const actualCount = frequency.get(Number(expectedValue)) || 0;
-      const diff = actualCount - expectedCount;
-      
-      if (diff > 0) {
-        overRepresented.push({ value: Number(expectedValue), excess: diff });
-      } else if (diff < 0) {
-        underRepresented.push(Number(expectedValue));
-      }
-    }
-    
-    if (overRepresented.length === 0 || underRepresented.length === 0) {
-      console.log(`[OCR] Ground truth frequency: no corrections needed`);
-      return;
-    }
-    
-    let corrections = 0;
-    
-    // For each over-represented value, find lowest-confidence cells
-    for (const { value: overVal, excess } of overRepresented) {
-      const cellsWithValue = cells
-        .filter(c => c.number === overVal)
-        .sort((a, b) => a.confidence - b.confidence)
-        .slice(0, excess);
-      
-      for (const cell of cellsWithValue) {
-        const key = `${cell.row},${cell.col}`;
-        const rawCell = rawCells.get(key);
-        
-        if (rawCell) {
-          // Try to match with under-represented values
-          let bestMatch: { number: number; confidence: number } | null = null;
-          
-          for (const underVal of underRepresented) {
-            const altTemplates = this.templates.filter(t => t.number === underVal);
-            if (altTemplates.length > 0) {
-              const match = matchTemplate(rawCell, altTemplates);
-              if (match && (!bestMatch || match.confidence > bestMatch.confidence)) {
-                bestMatch = { number: match.number, confidence: match.confidence };
-              }
-            }
-          }
-          
-          if (bestMatch && bestMatch.confidence > cell.confidence + 0.10) {
-            console.log(`[OCR] Ground truth frequency: ${cell.number} → ${bestMatch.number} at (${cell.row},${cell.col}) [conf: ${cell.confidence.toFixed(2)} → ${bestMatch.confidence.toFixed(2)}]`);
-            cell.number = bestMatch.number;
-            cell.confidence = bestMatch.confidence;
-            cell.rawText = String(bestMatch.number);
-            cell.rawOcr = String(bestMatch.number);
-            corrections++;
-          }
-        }
-      }
-    }
-    
-    console.log(`[OCR] Ground truth frequency corrections: ${corrections}`);
-  }
-
-  /**
-   * Position-Specific Validation using Ground Truth Grid
-   * Compares OCR result against known position and flags mismatches.
-   */
-  private validateAgainstGroundTruth(
-    row: number,
-    col: number,
-    value: number,
-    rawCell: ImageData
-  ): { value: number | null; confidence: number } {
-    const expectedValue = this.GROUND_TRUTH_GRID[row]?.[col];
-    
-    if (expectedValue === undefined) {
-      return { value, confidence: 0 };
-    }
-    
-    if (value === expectedValue) {
-      return { value, confidence: 1.0 };
-    }
-    
-    // Mismatch - try template matching for correction
-    if (this.templates.length > 0) {
-      const expectedTemplates = this.templates.filter(t => t.number === expectedValue);
-      if (expectedTemplates.length > 0) {
-        const match = matchTemplate(rawCell, expectedTemplates);
-        if (match && match.confidence > 0.50) {
-          console.log(`[OCR] Ground truth position: corrected ${value} → ${expectedValue} at (${row},${col})`);
-          return { value: expectedValue, confidence: match.confidence };
-        }
-      }
-    }
-    
-    console.log(`[OCR] Ground truth position: mismatch at (${row},${col}) expected=${expectedValue}, got=${value}`);
-    return { value: null, confidence: 0 };
-  }
-
-  /**
    * Fix 1.3: Correção baseada em frequência (AGRESSIVA)
    * Corrige quando:
    * - Valor aparece apenas 1-2x (suspicious)
@@ -818,20 +582,27 @@ export class CellNumberReader {
   async readAllCells(
     image: ImageData,
     grid: GridResult,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    options?: {
+      earlyAbortThreshold?: number;
+      minCellsProcessed?: number;
+    }
   ): Promise<CellNumberMap> {
     const startCol = 0;
     const total = grid.rows * (grid.cols - startCol);
     let extractionFailures = 0;
 
+    const earlyAbortThreshold = options?.earlyAbortThreshold ?? 0.25;
+    const minCellsProcessed = options?.minCellsProcessed ?? 10;
+
     console.log(`[CellNumberReader] Processing ${grid.rows} rows x ${grid.cols} cols, startCol=${startCol}, total=${total}`);
     console.log(`[CellNumberReader] Image size: ${image.width}x${image.height}`);
+    console.log(`[CellNumberReader] Early abort: threshold=${earlyAbortThreshold}, minCells=${minCellsProcessed}`);
 
     const rawCells: Map<string, ImageData> = new Map();
     const cellInputs: { imageData: Blob; row: number; col: number }[] = [];
     const cellOrder: { row: number; col: number }[] = [];
 
-    // Phase 1: Extract all cells and convert to blobs
     for (let row = 0; row < grid.rows; row++) {
       for (let col = startCol; col < grid.cols; col++) {
         try {
@@ -853,10 +624,40 @@ export class CellNumberReader {
 
     console.log(`[CellNumberReader] Extraction failures: ${extractionFailures}/${total}`);
 
-    // Phase 2: Batch OCR via API
-    const apiResults = await this.apiClient.recognizeAllCells(cellInputs, onProgress);
+    let aborted = false;
+    let abortReason = '';
 
-    // Phase 3: Build CellNumber array from API results
+    const apiResults = await this.apiClient.recognizeAllCells(
+      cellInputs,
+      onProgress,
+      (resultsSoFar, progress) => {
+        const processedCount = resultsSoFar.length;
+        if (processedCount < minCellsProcessed) return false;
+
+        const recognizedSoFar = resultsSoFar.filter(r => r.number !== null).length;
+        const coverageSoFar = recognizedSoFar / processedCount;
+
+        if (coverageSoFar < earlyAbortThreshold) {
+          aborted = true;
+          abortReason = `LOW_COVERAGE: ${(coverageSoFar * 100).toFixed(1)}% < ${(earlyAbortThreshold * 100).toFixed(0)}% after ${processedCount}/${cellInputs.length} cells`;
+          console.log(`[CellNumberReader] Early abort: ${abortReason}`);
+          return true;
+        }
+        return false;
+      }
+    );
+
+    if (aborted) {
+      return {
+        cells: [],
+        bySymbol: {},
+        recognized: 0,
+        total: cellInputs.length,
+        aborted: true,
+        abortReason,
+      };
+    }
+
     const cells: CellNumber[] = [];
     for (let i = 0; i < cellOrder.length; i++) {
       const { row, col } = cellOrder[i];
@@ -866,24 +667,12 @@ export class CellNumberReader {
       let number = apiResult.number;
       let confidence = apiResult.confidence;
 
-      // Fix 1.1: Corrige dígitos espúrios
       number = fixSpuriousDigits(number);
 
-      // Fix 2.4: Correção específica para "26"
       if (number !== null && rawCell) {
         const corrected26 = tryCorrect26(rawCell, this.templates, { number, confidence });
         number = corrected26.number;
         confidence = corrected26.confidence;
-      }
-
-      // Fix 4.2: Validação de posições conhecidas
-      if (number !== null && rawCell) {
-        number = this.validateKnownPositions(row, col, number, rawCell);
-      }
-
-      // Accuracy Improvement Plan: Validate unique value positions
-      if (number !== null && rawCell) {
-        number = this.validateUniqueValuePositions(row, col, number, rawCell);
       }
 
       const result: CellNumber = {
@@ -897,7 +686,6 @@ export class CellNumberReader {
 
       cells.push(result);
 
-      // Fix 2.2: Multi-template storage with diversity check (lower threshold)
       if (confidence >= 0.50 && number !== null && rawCell) {
         this.addTemplate(rawCell, number);
       }
@@ -905,34 +693,8 @@ export class CellNumberReader {
 
     console.log(`[CellNumberReader] Templates collected: ${this.templates.length}`);
 
-    // Ground Truth-Guided Frequency Correction
-    this.correctByGroundTruthFrequency(cells, rawCells);
-
     // Accuracy Improvement Plan: Confusion pair correction
     this.correctConfusionPairs(cells, rawCells);
-
-    // Position-Specific Validation using Ground Truth
-    let positionCorrections = 0;
-    for (const cell of cells) {
-      if (cell.number !== null) {
-        const rawCell = rawCells.get(`${cell.row},${cell.col}`);
-        if (rawCell) {
-          const validated = this.validateAgainstGroundTruth(
-            cell.row, cell.col, cell.number, rawCell
-          );
-          if (validated.value !== cell.number) {
-            cell.number = validated.value;
-            cell.confidence = validated.confidence;
-            if (validated.value !== null) {
-              cell.rawText = String(validated.value);
-              cell.rawOcr = String(validated.value);
-              positionCorrections++;
-            }
-          }
-        }
-      }
-    }
-    console.log(`[OCR] Ground truth position corrections: ${positionCorrections}`);
 
     // Phase 4: Template matching for remaining unrecognized cells
     if (this.templates.length > 0) {
@@ -1105,12 +867,16 @@ export class CellNumberReader {
     image: ImageData,
     grid: GridResult,
     onProgress?: (progress: number) => void,
-    apiUrl?: string
+    apiUrl?: string,
+    options?: {
+      earlyAbortThreshold?: number;
+      minCellsProcessed?: number;
+    }
   ): Promise<CellNumberMap> {
     const reader = new CellNumberReader(apiUrl);
     try {
       await reader.initialize();
-      return await reader.readAllCells(image, grid, onProgress);
+      return await reader.readAllCells(image, grid, onProgress, options);
     } finally {
       await reader.terminate();
     }

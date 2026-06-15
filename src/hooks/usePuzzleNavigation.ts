@@ -1,6 +1,6 @@
 // src/hooks/usePuzzleNavigation.ts
 import { useState, useCallback } from 'react';
-import type { GridCell } from '@/types';
+import type { GridCell } from '@/types/grid';
 
 interface ActiveCell {
   row: number;

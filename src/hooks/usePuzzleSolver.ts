@@ -1,6 +1,7 @@
 // src/hooks/usePuzzleSolver.ts
 import { useState, useCallback, useMemo } from 'react';
-import type { GridCell, SymbolMapping } from '@/types';
+import type { GridCell } from '@/types/grid';
+import type { SymbolMapping } from '@/types/symbol';
 import { SymbolMapper } from '@/lib/image-processing/SymbolMapper';
 
 export function usePuzzleSolver(
@@ -17,8 +18,9 @@ export function usePuzzleSolver(
 
   const updateCell = useCallback((row: number, col: number, value: string) => {
     setGrid((prevGrid) => {
-      const newGrid = prevGrid.map((r) => r.map((c) => ({ ...c })));
-      newGrid[row][col].userValue = value.toUpperCase();
+      const newGrid = prevGrid.slice();
+      newGrid[row] = prevGrid[row].slice();
+      newGrid[row][col] = { ...prevGrid[row][col], userValue: value.toUpperCase() };
       return newGrid;
     });
   }, []);

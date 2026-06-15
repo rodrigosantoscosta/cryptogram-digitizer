@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Camera, FolderOpen, Database } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { StepIndicator } from '../steps/StepIndicator';
 import { StepUpload } from '../steps/StepUpload';
 import { StepBatchUpload } from '../steps/StepBatchUpload';
@@ -7,7 +9,7 @@ import { StepBatchProcessing } from '../steps/StepBatchProcessing';
 import { StepPuzzleSelect } from '../steps/StepPuzzleSelect';
 import { StepMapping } from '../steps/StepMapping';
 import { StepSolution } from '../steps/StepSolution';
-import type { ProcessedData } from '../types/index';
+import type { ProcessedData } from '@/types/puzzle';
 import type { SymbolMapping } from '../types/symbol';
 
 type AppStep = 'upload' | 'processing' | 'mapping' | 'solution';
@@ -32,10 +34,15 @@ export function CryptogramSolver() {
   const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
   const [finalMapping, setFinalMapping] = useState<SymbolMapping>({});
 
+  const [puzzleId, setPuzzleId] = useState<string>('puzzle');
   const [batchImages, setBatchImages] = useState<BatchImage[]>([]);
   const [processedPuzzles, setProcessedPuzzles] = useState<ProcessedPuzzle[]>([]);
 
-  const handleImageReady = (data: ImageData) => {
+  const handleImageReady = (data: ImageData, fileName?: string) => {
+    if (fileName) {
+      // "test.jpg" → "test", "sample_2.jpg" → "sample_2"
+      setPuzzleId(fileName.replace(/\.[^/.]+$/, ''));
+    }
     setImageData(data);
     setStep('processing');
   };
@@ -57,6 +64,7 @@ export function CryptogramSolver() {
 
   const handlePuzzleSelect = (puzzle: ProcessedPuzzle) => {
     setProcessedData(puzzle.data);
+    setPuzzleId(puzzle.name.replace(/\.[^/.]+$/, ''));
     setStep('mapping');
   };
 
@@ -71,29 +79,65 @@ export function CryptogramSolver() {
     setFinalMapping({});
     setBatchImages([]);
     setProcessedPuzzles([]);
+    setPuzzleId('puzzle');
     setStep('upload');
   };
 
   const indicatorStep = step === 'solution' ? 'mapping' : step as 'upload' | 'processing' | 'mapping';
 
   return (
-    <div style={s.root}>
+    <div className="min-h-screen bg-surface-page flex flex-col">
+      {/* Navigation Bar */}
+      <nav className="bg-surface-card border-b border-border px-4 py-2">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Camera size={20} className="text-primary" />
+            <span className="font-semibold text-ink">Cryptogram Digitizer</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/"
+              className="text-sm text-ink-muted hover:text-ink transition-colors"
+            >
+              Solver
+            </Link>
+            <Link
+              to="/ground-truth"
+              className="text-sm text-ink-muted hover:text-ink transition-colors flex items-center gap-1"
+            >
+              <Database size={14} />
+              Ground Truth
+            </Link>
+          </div>
+        </div>
+      </nav>
+
       {step !== 'upload' && <StepIndicator current={indicatorStep} />}
-      <div style={s.content}>
+      <div className="flex-1 py-8 px-5 max-w-5xl mx-auto w-full box-border">
         {step === 'upload' && processedPuzzles.length === 0 && (
           <>
-            <div style={s.modeToggle}>
+            <div className="flex gap-2 justify-center mb-6">
               <button
-                style={{ ...s.modeBtn, ...(uploadMode === 'single' ? s.modeBtnActive : {}) }}
+                className={`
+                  px-5 py-2.5 text-sm font-medium rounded-input transition-all duration-200
+                  ${uploadMode === 'single'
+                    ? 'text-primary border-primary bg-primary-active'
+                    : 'text-ink-muted bg-surface-card border border-border hover:bg-surface-subtle'}
+                `}
                 onClick={() => setUploadMode('single')}
               >
-                📷 Imagem única
+                <Camera size={16} className="inline mr-1.5" /> Imagem única
               </button>
               <button
-                style={{ ...s.modeBtn, ...(uploadMode === 'batch' ? s.modeBtnActive : {}) }}
+                className={`
+                  px-5 py-2.5 text-sm font-medium rounded-input transition-all duration-200
+                  ${uploadMode === 'batch'
+                    ? 'text-primary border-primary bg-primary-active'
+                    : 'text-ink-muted bg-surface-card border border-border hover:bg-surface-subtle'}
+                `}
                 onClick={() => setUploadMode('batch')}
               >
-                📁 Lote de imagens
+                <FolderOpen size={16} className="inline mr-1.5" /> Lote de imagens
               </button>
             </div>
             {uploadMode === 'single' ? (
@@ -133,6 +177,8 @@ export function CryptogramSolver() {
             processedData={processedData}
             onRestart={handleRestart}
             onSolve={handleMappingComplete}
+            puzzleId={puzzleId}
+            originalImage={imageData ?? undefined}
           />
         )}
 
@@ -148,15 +194,3 @@ export function CryptogramSolver() {
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  root: { minHeight: '100vh', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column' },
-  content: { flex: 1, padding: '32px 20px', maxWidth: 1200, margin: '0 auto', width: '100%', boxSizing: 'border-box' },
-  modeToggle: { display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 24 },
-  modeBtn: {
-    padding: '10px 20px', fontSize: 14, fontWeight: 500, color: '#666',
-    background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8, cursor: 'pointer',
-    transition: 'all .2s',
-  },
-  modeBtnActive: { color: '#667eea', borderColor: '#667eea', background: '#f0f4ff' },
-};

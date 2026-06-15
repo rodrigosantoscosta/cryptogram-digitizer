@@ -8,11 +8,13 @@
 import type {
   ExtractedSymbol,
   SymbolFeatures,
+  CellPosition,
+} from '@/types/symbol';
+import type {
   Contour,
   BoundingBox,
-  CellPosition,
   GridResult
-} from '@/types';
+} from '@/types/image';
 
 declare const cv: any;
 

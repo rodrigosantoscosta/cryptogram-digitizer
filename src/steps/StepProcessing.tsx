@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useImageProcessor } from '../hooks/useImageProcessor';
-import type { ProcessedData } from '../types/index';
+import type { ProcessedData } from '@/types/puzzle';
 
 interface Props {
   imageData: ImageData;
@@ -33,34 +33,42 @@ export function StepProcessing({ imageData, onDone, onBack }: Props) {
   const barColor = STAGE_COLOR[status.stage] ?? '#667eea';
 
   return (
-    <div style={s.wrap}>
-      <h1 style={s.title}>Processando Criptograma</h1>
+    <div className="max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6 text-ink">Processando Criptograma</h1>
 
-      <div style={s.card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-          <span style={{ fontSize: 20, fontWeight: 600, color: '#1a1a1a' }}>
+      <div className="bg-surface-card border border-border rounded-card p-7 mb-5">
+        <div className="flex justify-between items-baseline mb-3.5">
+          <span className="text-xl font-semibold text-ink">
             {STAGE_LABELS[status.stage] ?? status.stage}
           </span>
-          <span style={{ fontSize: 28, fontWeight: 700, color: barColor }}>
+          <span className="text-3xl font-bold" style={{ color: barColor }}>
             {status.progress.toFixed(0)}%
           </span>
         </div>
-        <div style={s.barTrack}>
-          <div style={{ ...s.barFill, width: `${status.progress}%`, background: barColor }} />
+        <div className="w-full h-2.5 bg-border rounded-full overflow-hidden">
+          <div
+            className="h-full transition-all duration-300 ease-in-out"
+            style={{ width: `${status.progress}%`, background: barColor }}
+          />
         </div>
         {status.currentStep && (
-          <p style={{ fontSize: 13, color: '#666', marginTop: 10, marginBottom: 0 }}>{status.currentStep}</p>
+          <p className="text-xs text-ink-muted mt-2.5 mb-0">{status.currentStep}</p>
         )}
         {status.error && (
-          <div style={s.errorBox}>
+          <div className="bg-red-50 border border-red-200 rounded-input px-4 py-3 text-error text-sm mt-3.5 flex justify-between items-center">
             <strong>Erro: </strong>{status.error.message}
-            <button style={s.retryBtn} onClick={onBack}>Tentar novamente</button>
+            <button
+              className="bg-none border border-error text-error rounded-input px-3 py-1 cursor-pointer text-xs hover:bg-error/10 transition-colors"
+              onClick={onBack}
+            >
+              Tentar novamente
+            </button>
           </div>
         )}
       </div>
 
-      <div style={s.imgCard}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#666', marginBottom: 8 }}>
+      <div className="bg-surface-subtle border border-border rounded-card p-5">
+        <p className="text-xs font-semibold text-ink-muted mb-2">
           Imagem carregada — {imageData.width}×{imageData.height}px
         </p>
         <canvas
@@ -70,23 +78,9 @@ export function StepProcessing({ imageData, onDone, onBack }: Props) {
             canvas.height = imageData.height;
             canvas.getContext('2d')!.putImageData(imageData, 0, 0);
           }}
-          style={{ width: '100%', height: 'auto', borderRadius: 8, border: '1px solid #e5e5e5' }}
+          className="w-full h-auto rounded-input border border-border"
         />
       </div>
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  wrap: { maxWidth: 800, margin: '0 auto' },
-  title: { fontSize: 28, fontWeight: 700, marginBottom: 24, color: '#1a1a1a' },
-  card: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 28, marginBottom: 20 },
-  barTrack: { width: '100%', height: 10, background: '#e5e5e5', borderRadius: 5, overflow: 'hidden' },
-  barFill: { height: '100%', transition: 'width .3s ease, background .3s' },
-  errorBox: {
-    background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 16px',
-    color: '#dc2626', fontSize: 13, marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-  },
-  retryBtn: { background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 12 },
-  imgCard: { background: '#f8f9fa', border: '1px solid #e5e5e5', borderRadius: 12, padding: 20 },
-};

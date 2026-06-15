@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import type { GridCell } from '@/types';
+import type { GridCell } from '@/types/grid';
 import { usePuzzleNavigation } from '@/hooks/usePuzzleNavigation';
 
 // ─── Re-implementação local (funções não exportadas) ──────────────────────────

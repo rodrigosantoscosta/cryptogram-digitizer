@@ -1,26 +1,28 @@
 // src/lib/ocr/OCREngine.ts
-import Tesseract, { createWorker, PSM } from 'tesseract.js';
-import type { OCRConfig, ClueResult } from '@/types';
+import type { OCRConfig, ClueResult } from '@/types/ocr';
+
+export const PSM_SINGLE_COLUMN = 3;
 
 export class OCREngine {
-  private worker: Tesseract.Worker | null = null;
+  private worker: any = null;
   private config: OCRConfig;
 
   constructor(config?: Partial<OCRConfig>) {
     this.config = {
       language: 'por',
       whitelist: undefined,
-      pageSegMode: PSM.SINGLE_COLUMN,
+      pageSegMode: PSM_SINGLE_COLUMN,
       ...config,
     };
   }
 
   async initialize(language?: string): Promise<void> {
+    const { createWorker } = await import('tesseract.js');
     const lang = language || this.config.language;
     this.worker = await createWorker(lang);
 
-    const params: Partial<Tesseract.WorkerParams> = {
-      tessedit_pageseg_mode: (this.config.pageSegMode ?? PSM.SINGLE_COLUMN) as PSM,
+    const params: Record<string, unknown> = {
+      tessedit_pageseg_mode: this.config.pageSegMode ?? PSM_SINGLE_COLUMN,
     };
     if (this.config.whitelist) {
       params['tessedit_char_whitelist'] = this.config.whitelist;
@@ -46,7 +48,7 @@ export class OCREngine {
     if (!this.worker) throw new Error('OCR Engine não inicializado');
 
     await this.worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_COLUMN,
+      tessedit_pageseg_mode: PSM_SINGLE_COLUMN,
     });
 
     const canvas = document.createElement('canvas');
@@ -108,13 +110,13 @@ export class OCREngine {
     }
 
     if (allWords.length === 0 && data.text) {
-      const lines = data.text.split('\n').filter(l => l.trim());
+      const lines = (data.text as string).split('\n').filter((l: string) => l.trim());
       const totalHeight = columnImage.height;
       return Array.from({ length: numRows }, (_, row) => {
         const rowTop    = (rowPositions[row]     - rowStartY) * scaleFactor;
         const rowBottom = (rowPositions[row + 1] - rowStartY) * scaleFactor;
         const lineHeight = totalHeight / Math.max(lines.length, 1);
-        const chunk = lines.filter((_, i) => {
+        const chunk = lines.filter((_line: string, i: number) => {
           const lineY = (i + 0.5) * lineHeight;
           return lineY >= rowTop && lineY < rowBottom;
         }).join(' ');
@@ -145,7 +147,7 @@ export class OCREngine {
   async recognizeClue(
     cellImage: ImageData,
     row: number,
-    psm?: PSM
+    psm?: number
   ): Promise<ClueResult> {
     if (!this.worker) throw new Error('OCR Engine não inicializado');
 
@@ -162,7 +164,7 @@ export class OCREngine {
 
     if (psm !== undefined) {
       await this.worker.setParameters({
-        tessedit_pageseg_mode: (this.config.pageSegMode ?? PSM.SINGLE_COLUMN) as PSM,
+        tessedit_pageseg_mode: this.config.pageSegMode ?? PSM_SINGLE_COLUMN,
       });
     }
 

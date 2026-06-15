@@ -35,3 +35,9 @@ samples.zip
 
 # Serena AI project files
 .serena/
+
+# OpenSpec SDD files
+openspec/
+
+# Sample images (JPG)
+*.jpg

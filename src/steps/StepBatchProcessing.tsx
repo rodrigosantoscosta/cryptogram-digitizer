@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { useImageProcessor } from '../hooks/useImageProcessor';
 import type { ProcessedData } from '../types/puzzle';
 
@@ -97,91 +98,73 @@ export function StepBatchProcessing({ images, onDone, onBack }: Props) {
   const currentStageLabel = currentImage?.status === 'processing' ? STAGE_LABELS[status.stage] ?? status.stage : '';
 
   return (
-    <div style={s.wrap}>
-      <h1 style={s.title}>Processando Lote</h1>
+    <div className="max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6 text-ink">Processando Lote</h1>
 
-      <div style={s.overallCard}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-          <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>
-            Progresso geral
-          </span>
-          <span style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>
-            {completedImages}/{totalImages}
-          </span>
+      <div className="bg-surface-card border border-border rounded-card p-6 mb-5">
+        <div className="flex justify-between items-baseline mb-3.5">
+          <span className="text-lg font-semibold text-ink">Progresso geral</span>
+          <span className="text-2xl font-bold text-primary">{completedImages}/{totalImages}</span>
         </div>
-        <div style={s.barTrack}>
-          <div style={{ ...s.barFill, width: `${overallProgress}%` }} />
+        <div className="w-full h-2.5 bg-border rounded-full overflow-hidden">
+          <div className="h-full bg-primary transition-all duration-300 ease-in-out" style={{ width: `${overallProgress}%` }} />
         </div>
-        <div style={s.stats}>
-          <span style={s.statDone}>✅ {completedImages} concluídas</span>
-          {errorImages > 0 && <span style={s.statError}>❌ {errorImages} erros</span>}
-          <span style={s.statPending}> {totalImages - completedImages - errorImages} pendentes</span>
+        <div className="flex gap-4 mt-3 text-xs text-ink-muted">
+          <span className="text-success flex items-center gap-1">
+            <CheckCircle size={14} />{completedImages} concluídas
+          </span>
+          {errorImages > 0 && (
+            <span className="text-error flex items-center gap-1">
+              <XCircle size={14} />{errorImages} erros
+            </span>
+          )}
+          <span>{totalImages - completedImages - errorImages} pendentes</span>
         </div>
       </div>
 
-      <div style={s.list}>
+      <div className="bg-surface-card border border-border rounded-card p-4">
         {imageStatuses.map((img, idx) => (
-          <div key={img.id} style={{ ...s.item, ...(img.status === 'processing' ? s.itemActive : {}) }}>
-            <div style={s.itemLeft}>
-              <span style={s.itemIndex}>{idx + 1}</span>
-              <div>
-                <p style={s.itemName} title={img.name}>{img.name}</p>
+          <div
+            key={img.id}
+            className={`
+              flex justify-between items-center p-3 px-4 rounded-input mb-2 bg-surface-subtle transition-colors
+              ${img.status === 'processing' ? 'bg-primary-active border border-primary' : ''}
+            `}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <span className="w-7 h-7 rounded-full bg-border flex items-center justify-center text-xs font-semibold text-ink-muted flex-shrink-0">
+                {idx + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink m-0 whitespace-nowrap overflow-hidden text-ellipsis" title={img.name}>{img.name}</p>
                 {img.status === 'processing' && currentStageLabel && (
-                  <p style={s.itemStage}>{currentStageLabel} — {status.progress.toFixed(0)}%</p>
+                  <p className="text-xs text-primary m-0 mt-0.5">{currentStageLabel} — {status.progress.toFixed(0)}%</p>
                 )}
                 {img.status === 'error' && img.error && (
-                  <p style={s.itemError}>{img.error}</p>
+                  <p className="text-xs text-error m-0 mt-0.5">{img.error}</p>
                 )}
               </div>
             </div>
-            <div style={s.itemStatus}>
-              {img.status === 'done' && <span style={s.badgeDone}>Concluído</span>}
+            <div className="flex-shrink-0 ml-3">
+              {img.status === 'done' && <span className="text-xs text-success font-medium">Concluído</span>}
               {img.status === 'processing' && (
-                <div style={s.miniBarTrack}>
-                  <div style={{ ...s.miniBarFill, width: `${status.progress}%` }} />
+                <div className="w-20 h-1.5 bg-border rounded-sm overflow-hidden">
+                  <div className="h-full bg-primary transition-all duration-300 ease-in-out" style={{ width: `${status.progress}%` }} />
                 </div>
               )}
-              {img.status === 'pending' && <span style={s.badgePending}>Pendente</span>}
-              {img.status === 'error' && <span style={s.badgeError}>Erro</span>}
+              {img.status === 'pending' && <span className="text-xs text-ink-faint">Pendente</span>}
+              {img.status === 'error' && <span className="text-xs text-error font-medium">Erro</span>}
             </div>
           </div>
         ))}
       </div>
 
       {results.length === 0 && errorImages === totalImages && (
-        <div style={s.errorBox}>
+        <div className="bg-red-50 border border-red-200 rounded-input px-5 py-4 text-error text-sm mt-5 flex justify-between items-center">
           <strong>Todas as imagens falharam. </strong>
-          <button style={s.retryBtn} onClick={onBack}>Tentar novamente</button>
+          <button className="bg-none border border-error text-error rounded-input px-4 py-1.5 cursor-pointer text-sm hover:bg-error/10 transition-colors" onClick={onBack}>Tentar novamente</button>
         </div>
       )}
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  wrap: { maxWidth: 800, margin: '0 auto' },
-  title: { fontSize: 28, fontWeight: 700, marginBottom: 24, color: '#1a1a1a' },
-  overallCard: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 24, marginBottom: 20 },
-  barTrack: { width: '100%', height: 10, background: '#e5e5e5', borderRadius: 5, overflow: 'hidden' },
-  barFill: { height: '100%', background: '#667eea', transition: 'width .3s ease' },
-  stats: { display: 'flex', gap: 16, marginTop: 12, fontSize: 13, color: '#666' },
-  statDone: { color: '#22c55e' },
-  statError: { color: '#ef4444' },
-  statPending: { color: '#999' },
-  list: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 16 },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: 8, marginBottom: 8, background: '#fafafa' },
-  itemActive: { background: '#f0f4ff', border: '1px solid #667eea' },
-  itemLeft: { display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
-  itemIndex: { width: 28, height: 28, borderRadius: '50%', background: '#e5e5e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#666', flexShrink: 0 },
-  itemName: { fontSize: 14, fontWeight: 500, color: '#1a1a1a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  itemStage: { fontSize: 12, color: '#667eea', margin: '2px 0 0' },
-  itemError: { fontSize: 12, color: '#dc2626', margin: '2px 0 0' },
-  itemStatus: { flexShrink: 0, marginLeft: 12 },
-  badgeDone: { fontSize: 12, color: '#22c55e', fontWeight: 500 },
-  badgePending: { fontSize: 12, color: '#999' },
-  badgeError: { fontSize: 12, color: '#dc2626', fontWeight: 500 },
-  miniBarTrack: { width: 80, height: 6, background: '#e5e5e5', borderRadius: 3, overflow: 'hidden' },
-  miniBarFill: { height: '100%', background: '#667eea', transition: 'width .3s ease' },
-  errorBox: { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '16px 20px', color: '#dc2626', fontSize: 14, marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  retryBtn: { background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 6, padding: '6px 16px', cursor: 'pointer', fontSize: 13 },
-};

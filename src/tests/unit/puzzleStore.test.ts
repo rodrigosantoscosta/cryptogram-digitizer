@@ -6,7 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { PuzzleState, PuzzleMetadata, ProcessedData, SymbolMapping, GridCell } from '@/types';
+import type { PuzzleState, PuzzleMetadata, ProcessedData } from '@/types/puzzle';
+import type { SymbolMapping } from '@/types/symbol';
+import type { GridCell } from '@/types/grid';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,7 +57,7 @@ function makePuzzleState(id: string = 'test-1'): PuzzleState {
 interface StoreState {
   currentPuzzle: PuzzleState | null;
   savedPuzzles: PuzzleMetadata[];
-  pendingProcessedData: ProcessedData | null;
+
 }
 
 function setCurrentPuzzle(state: StoreState, puzzle: PuzzleState): StoreState {
@@ -144,7 +146,7 @@ function clearCurrentPuzzle(state: StoreState): StoreState {
 
 describe('puzzleStore — setCurrentPuzzle', () => {
   it('deve definir o puzzle atual', () => {
-    const state: StoreState = { currentPuzzle: null, savedPuzzles: [], pendingProcessedData: null };
+    const state: StoreState = { currentPuzzle: null, savedPuzzles: [] };
     const puzzle = makePuzzleState();
 
     const result = setCurrentPuzzle(state, puzzle);
@@ -160,7 +162,7 @@ describe('puzzleStore — updateMapping', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
     const mapping: SymbolMapping = { sym_A: 'C', sym_B: 'A' };
 
@@ -173,7 +175,7 @@ describe('puzzleStore — updateMapping', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
     const oldDate = new Date('2020-01-01');
     state.currentPuzzle!.metadata.lastModified = oldDate;
@@ -184,7 +186,7 @@ describe('puzzleStore — updateMapping', () => {
   });
 
   it('deve retornar o mesmo state se não há puzzle atual', () => {
-    const state: StoreState = { currentPuzzle: null, savedPuzzles: [], pendingProcessedData: null };
+    const state: StoreState = { currentPuzzle: null, savedPuzzles: [] };
 
     const result = updateMapping(state, { sym_A: 'C' });
 
@@ -199,7 +201,7 @@ describe('puzzleStore — updateSolution', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
 
     const result = updateSolution(state, 0, 1, 'C');
@@ -211,7 +213,7 @@ describe('puzzleStore — updateSolution', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
     // 4 células editáveis
     // Preencher 1 → 25%
@@ -223,7 +225,7 @@ describe('puzzleStore — updateSolution', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
 
     let result = updateSolution(state, 0, 1, 'C');
@@ -236,7 +238,7 @@ describe('puzzleStore — updateSolution', () => {
   });
 
   it('deve retornar o mesmo state se não há puzzle atual', () => {
-    const state: StoreState = { currentPuzzle: null, savedPuzzles: [], pendingProcessedData: null };
+    const state: StoreState = { currentPuzzle: null, savedPuzzles: [] };
 
     const result = updateSolution(state, 0, 0, 'A');
 
@@ -251,7 +253,7 @@ describe('puzzleStore — savePuzzle', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState('puzzle-1'),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
 
     const result = savePuzzle(state);
@@ -264,7 +266,7 @@ describe('puzzleStore — savePuzzle', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState('puzzle-1'),
       savedPuzzles: [makeMetadata('puzzle-2'), makeMetadata('puzzle-1')],
-      pendingProcessedData: null,
+
     };
 
     const result = savePuzzle(state);
@@ -274,7 +276,7 @@ describe('puzzleStore — savePuzzle', () => {
   });
 
   it('não deve salvar se não há puzzle atual', () => {
-    const state: StoreState = { currentPuzzle: null, savedPuzzles: [], pendingProcessedData: null };
+    const state: StoreState = { currentPuzzle: null, savedPuzzles: [] };
 
     const result = savePuzzle(state);
 
@@ -289,7 +291,7 @@ describe('puzzleStore — deletePuzzle', () => {
     const state: StoreState = {
       currentPuzzle: null,
       savedPuzzles: [makeMetadata('puzzle-1'), makeMetadata('puzzle-2')],
-      pendingProcessedData: null,
+
     };
 
     const result = deletePuzzle(state, 'puzzle-1');
@@ -302,7 +304,7 @@ describe('puzzleStore — deletePuzzle', () => {
     const state: StoreState = {
       currentPuzzle: null,
       savedPuzzles: [makeMetadata('puzzle-1')],
-      pendingProcessedData: null,
+
     };
 
     const result = deletePuzzle(state, 'nonexistent');
@@ -318,7 +320,7 @@ describe('puzzleStore — clearCurrentPuzzle', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [],
-      pendingProcessedData: null,
+
     };
 
     const result = clearCurrentPuzzle(state);
@@ -330,7 +332,7 @@ describe('puzzleStore — clearCurrentPuzzle', () => {
     const state: StoreState = {
       currentPuzzle: makePuzzleState(),
       savedPuzzles: [makeMetadata('puzzle-1')],
-      pendingProcessedData: null,
+
     };
 
     const result = clearCurrentPuzzle(state);

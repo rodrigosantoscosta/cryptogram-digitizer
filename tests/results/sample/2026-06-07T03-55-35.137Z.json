@@ -1,0 +1,1029 @@
+{
+  "puzzleId": "sample",
+  "timestamp": "2026-06-07T03:55:35.137Z",
+  "cells": [
+    {
+      "row": 0,
+      "col": 0,
+      "expected": 1,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 1,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 2,
+      "expected": 12,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 3,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 4,
+      "expected": 10,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 5,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 6,
+      "expected": 2,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 0,
+      "col": 7,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 0,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 1,
+      "expected": 1,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 2,
+      "expected": 19,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 3,
+      "expected": 14,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 4,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 5,
+      "expected": 12,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 6,
+      "expected": 18,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 1,
+      "col": 7,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 0,
+      "expected": 11,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 1,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 2,
+      "expected": 16,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 3,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 4,
+      "expected": 1,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 5,
+      "expected": 19,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 6,
+      "expected": 8,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 2,
+      "col": 7,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 0,
+      "expected": 14,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 1,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 2,
+      "expected": 19,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 3,
+      "expected": 17,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 4,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 5,
+      "expected": 5,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 3,
+      "col": 6,
+      "expected": 3,
+      "actual": 1,
+      "confidence": 0.2060312787910954,
+      "match": "incorrect"
+    },
+    {
+      "row": 3,
+      "col": 7,
+      "expected": 11,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 4,
+      "col": 0,
+      "expected": 10,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 4,
+      "col": 1,
+      "expected": 7,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 4,
+      "col": 2,
+      "expected": 12,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 4,
+      "col": 3,
+      "expected": 5,
+      "actual": 13,
+      "confidence": 0.7733824344969135,
+      "match": "incorrect"
+    },
+    {
+      "row": 4,
+      "col": 4,
+      "expected": 19,
+      "actual": 19,
+      "confidence": 0.9999519529307797,
+      "match": "correct"
+    },
+    {
+      "row": 4,
+      "col": 5,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 4,
+      "col": 6,
+      "expected": 2,
+      "actual": 5,
+      "confidence": 0.9999973773973494,
+      "match": "incorrect"
+    },
+    {
+      "row": 4,
+      "col": 7,
+      "expected": 13,
+      "actual": 3,
+      "confidence": 0.9999992847443906,
+      "match": "incorrect"
+    },
+    {
+      "row": 5,
+      "col": 0,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 5,
+      "col": 1,
+      "expected": 17,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 5,
+      "col": 2,
+      "expected": 14,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 5,
+      "col": 3,
+      "expected": 7,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 5,
+      "col": 4,
+      "expected": 12,
+      "actual": 12,
+      "confidence": 0.9999199219269502,
+      "match": "correct"
+    },
+    {
+      "row": 5,
+      "col": 5,
+      "expected": 6,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 5,
+      "col": 6,
+      "expected": 26,
+      "actual": 26,
+      "confidence": 0.6957029796775277,
+      "match": "correct"
+    },
+    {
+      "row": 5,
+      "col": 7,
+      "expected": 10,
+      "actual": 2,
+      "confidence": 1,
+      "match": "incorrect"
+    },
+    {
+      "row": 6,
+      "col": 0,
+      "expected": 22,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 6,
+      "col": 1,
+      "expected": 7,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 6,
+      "col": 2,
+      "expected": 10,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 6,
+      "col": 3,
+      "expected": 13,
+      "actual": 17,
+      "confidence": 0.9804435350393422,
+      "match": "incorrect"
+    },
+    {
+      "row": 6,
+      "col": 4,
+      "expected": 4,
+      "actual": 14,
+      "confidence": 0.9999743748122707,
+      "match": "incorrect"
+    },
+    {
+      "row": 6,
+      "col": 5,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 6,
+      "col": 6,
+      "expected": 12,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 6,
+      "col": 7,
+      "expected": 3,
+      "actual": 26,
+      "confidence": 0.9999927507497521,
+      "match": "incorrect"
+    },
+    {
+      "row": 7,
+      "col": 0,
+      "expected": 7,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 1,
+      "expected": 16,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 2,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 3,
+      "expected": 12,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 4,
+      "expected": 7,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 5,
+      "expected": 1,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 6,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 7,
+      "col": 7,
+      "expected": 17,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 0,
+      "expected": 2,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 1,
+      "expected": 19,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 2,
+      "expected": 27,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 3,
+      "expected": 10,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 4,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 5,
+      "expected": 2,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 6,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 8,
+      "col": 7,
+      "expected": 17,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 0,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 1,
+      "expected": 4,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 2,
+      "expected": 19,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 3,
+      "expected": 5,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 4,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 5,
+      "expected": 12,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 6,
+      "expected": 18,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 9,
+      "col": 7,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 0,
+      "expected": 2,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 1,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 2,
+      "expected": 1,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 3,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 4,
+      "expected": 10,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 5,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 10,
+      "col": 6,
+      "expected": 2,
+      "actual": 2,
+      "confidence": 1,
+      "match": "correct"
+    },
+    {
+      "row": 10,
+      "col": 7,
+      "expected": 26,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 0,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 1,
+      "expected": 1,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 2,
+      "expected": 13,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 3,
+      "expected": 17,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 4,
+      "expected": 4,
+      "actual": 13,
+      "confidence": 0.9998380756480454,
+      "match": "incorrect"
+    },
+    {
+      "row": 11,
+      "col": 5,
+      "expected": 3,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 6,
+      "expected": 16,
+      "actual": null,
+      "confidence": 0,
+      "match": "missed"
+    },
+    {
+      "row": 11,
+      "col": 7,
+      "expected": 26,
+      "actual": 16,
+      "confidence": 0.9999757235015667,
+      "match": "incorrect"
+    }
+  ],
+  "metrics": {
+    "accuracy": 0.041666666666666664,
+    "precision": 1,
+    "recall": 0.046511627906976744,
+    "f1Score": 0.08888888888888888,
+    "coverage": 0.14583333333333334,
+    "editDistance": 92,
+    "normalizedEditDistance": 0.9583333333333334,
+    "perDigit": {
+      "1": {
+        "digit": 1,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 6,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "2": {
+        "digit": 2,
+        "truePositives": 1,
+        "falsePositives": 1,
+        "falseNegatives": 5,
+        "precision": 0.5,
+        "recall": 0.16666666666666666,
+        "f1Score": 0.25
+      },
+      "3": {
+        "digit": 3,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 10,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "4": {
+        "digit": 4,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 3,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "5": {
+        "digit": 5,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 3,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "6": {
+        "digit": 6,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "7": {
+        "digit": 7,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 5,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "8": {
+        "digit": 8,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "9": {
+        "digit": 9,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "10": {
+        "digit": 10,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 6,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "11": {
+        "digit": 11,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 2,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "12": {
+        "digit": 12,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 6,
+        "precision": 1,
+        "recall": 0.14285714285714285,
+        "f1Score": 0.25
+      },
+      "13": {
+        "digit": 13,
+        "truePositives": 0,
+        "falsePositives": 2,
+        "falseNegatives": 10,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "14": {
+        "digit": 14,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 3,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "15": {
+        "digit": 15,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "16": {
+        "digit": 16,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 3,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "17": {
+        "digit": 17,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 5,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "18": {
+        "digit": 18,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 2,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "19": {
+        "digit": 19,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 5,
+        "precision": 1,
+        "recall": 0.16666666666666666,
+        "f1Score": 0.2857142857142857
+      },
+      "20": {
+        "digit": 20,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "21": {
+        "digit": 21,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "22": {
+        "digit": 22,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "23": {
+        "digit": 23,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "24": {
+        "digit": 24,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "25": {
+        "digit": 25,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      },
+      "26": {
+        "digit": 26,
+        "truePositives": 1,
+        "falsePositives": 1,
+        "falseNegatives": 14,
+        "precision": 0.5,
+        "recall": 0.06666666666666667,
+        "f1Score": 0.11764705882352941
+      },
+      "27": {
+        "digit": 27,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1Score": 0
+      }
+    }
+  },
+  "aborted": false
+}

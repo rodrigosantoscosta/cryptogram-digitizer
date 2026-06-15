@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Image as ImageIcon } from 'lucide-react';
+import { loadOpenCV } from '@/lib/opencv/loadOpenCV';
 
 interface Props {
-  onImageReady: (imageData: ImageData) => void;
+  onImageReady: (imageData: ImageData, fileName?: string) => void;
 }
 
 export function StepUpload({ onImageReady }: Props) {
@@ -10,6 +12,10 @@ export function StepUpload({ onImageReady }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    loadOpenCV();
+  }, []);
 
   const handleFile = (f: File) => {
     if (!f.type.startsWith('image/')) { alert('Selecione uma imagem válida.'); return; }
@@ -31,7 +37,7 @@ export function StepUpload({ onImageReady }: Props) {
       canvas.height = img.height;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0);
-      onImageReady(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      onImageReady(ctx.getImageData(0, 0, canvas.width, canvas.height), file?.name);
     } catch {
       alert('Erro ao carregar a imagem. Tente novamente.');
     } finally {
@@ -40,13 +46,16 @@ export function StepUpload({ onImageReady }: Props) {
   };
 
   return (
-    <div style={s.wrap}>
-      <h1 style={s.title}>Carregar Criptograma</h1>
-      <p style={s.sub}>Faça upload de uma foto do criptograma para começar</p>
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-1.5 text-ink">Carregar Criptograma</h1>
+      <p className="text-sm text-ink-muted mb-7">Faça upload de uma foto do criptograma para começar</p>
 
       {!preview ? (
         <div
-          style={{ ...s.drop, ...(isDragging ? s.dropActive : {}) }}
+          className={`
+            border-2 border-dashed rounded-card p-14 text-center cursor-pointer transition-all duration-200 mb-6
+            ${isDragging ? 'border-primary bg-primary-active' : 'border-border bg-surface-page'}
+          `}
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
@@ -61,25 +70,28 @@ export function StepUpload({ onImageReady }: Props) {
           role="button"
           aria-label="Clique ou arraste uma imagem aqui para fazer upload"
         >
-          <div style={{ fontSize: 64, marginBottom: 12 }}>🖼️</div>
-          <p style={{ fontSize: 17, color: '#333', margin: '0 0 6px' }}>Arraste ou clique para selecionar</p>
-          <p style={{ fontSize: 13, color: '#999', margin: 0 }}>JPG, PNG, JPEG</p>
-          <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+          <ImageIcon size={64} className="mx-auto mb-3 text-ink-faint" />
+          <p className="text-base text-ink font-medium mb-1.5">Arraste ou clique para selecionar</p>
+          <p className="text-xs text-ink-faint m-0">JPG, PNG, JPEG</p>
+          <input ref={inputRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
         </div>
       ) : (
-        <div style={s.preview}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <strong style={{ fontSize: 16 }}>Pré-visualização</strong>
-            <button style={s.removeBtn} onClick={() => { setPreview(''); setFile(null); }}>Remover</button>
+        <div className="bg-surface-card border border-border rounded-card p-5 mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <strong className="text-base">Pré-visualização</strong>
+            <button className="bg-none border-none text-error cursor-pointer text-sm hover:bg-error/10 px-2 py-1 rounded-input transition-colors" onClick={() => { setPreview(''); setFile(null); }}>Remover</button>
           </div>
-          <img src={preview} alt="preview" style={s.img} />
-          <div style={s.meta}>
+          <img src={preview} alt="preview" className="w-full h-auto rounded-input block mb-3 border border-border" />
+          <div className="flex justify-between text-xs text-ink bg-surface-subtle px-3 py-2 rounded-input mb-3.5">
             <span>{file?.name}</span>
-            <span style={{ color: '#999' }}>{formatSize(file?.size ?? 0)}</span>
+            <span className="text-ink-faint">{formatSize(file?.size ?? 0)}</span>
           </div>
           <button
-            style={{ ...s.procBtn, ...(isLoading ? s.procBtnDisabled : {}) }}
+            className={`
+              w-full py-3.5 text-sm font-semibold text-white rounded-input cursor-pointer transition-all duration-200
+              ${isLoading ? 'bg-ink-faint cursor-not-allowed' : 'bg-primary hover:bg-primary-hover'}
+            `}
             onClick={handleProcess}
             disabled={isLoading}
           >
@@ -88,9 +100,9 @@ export function StepUpload({ onImageReady }: Props) {
         </div>
       )}
 
-      <div style={s.tips}>
-        <strong style={{ display: 'block', marginBottom: 8 }}>Dicas para melhor resultado</strong>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#666', lineHeight: 1.8 }}>
+      <div className="bg-surface-subtle border border-border rounded-input p-4.5 px-5">
+        <strong className="block mb-2 text-sm">Dicas para melhor resultado</strong>
+        <ul className="m-0 pl-4.5 text-xs text-ink-muted leading-relaxed">
           <li>Use boa iluminação e evite sombras</li>
           <li>Câmera paralela ao criptograma</li>
           <li>Capture a grade completa</li>
@@ -107,21 +119,3 @@ function formatSize(b: number) {
   const i = Math.floor(Math.log(b) / Math.log(k));
   return `${Math.round(b / Math.pow(k, i) * 100) / 100} ${sizes[i]}`;
 }
-
-const s: Record<string, React.CSSProperties> = {
-  wrap:         { maxWidth: 720, margin: '0 auto' },
-  title:        { fontSize: 28, fontWeight: 700, marginBottom: 6, color: '#1a1a1a' },
-  sub:          { fontSize: 15, color: '#666', marginBottom: 28 },
-  drop:         { border: '2px dashed #ccc', borderRadius: 12, padding: '56px 24px', textAlign: 'center',
-                  cursor: 'pointer', background: '#fafafa', transition: 'all .2s', marginBottom: 24 },
-  dropActive:   { borderColor: '#667eea', background: '#f0f4ff' },
-  preview:      { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 20, marginBottom: 24 },
-  img:          { width: '100%', height: 'auto', borderRadius: 8, display: 'block', marginBottom: 12, border: '1px solid #e5e5e5' },
-  meta:         { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#333',
-                  background: '#f8f9fa', padding: '8px 12px', borderRadius: 6, marginBottom: 14 },
-  removeBtn:    { background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 13 },
-  procBtn:      { width: '100%', padding: 14, fontSize: 15, fontWeight: 600, color: '#fff',
-                  background: '#667eea', border: 'none', borderRadius: 8, cursor: 'pointer' },
-  procBtnDisabled: { background: '#ccc', cursor: 'not-allowed' },
-  tips:         { background: '#f8f9fa', border: '1px solid #e5e5e5', borderRadius: 10, padding: '18px 20px' },
-};

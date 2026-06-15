@@ -8,7 +8,20 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PuzzleGrid } from '@/components/PuzzleGrid/PuzzleGrid';
-import type { GridCell, ExtractedSymbol } from '@/types';
+import type { GridCell } from '@/types/grid';
+import type { ExtractedSymbol } from '@/types/symbol';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeSymbol(id: string, imageData: ImageData): ExtractedSymbol {
+  return {
+    id,
+    imageData,
+    features: { area: 0, perimeter: 0, aspectRatio: 0, moments: [], histogram: [], centerOfMass: { x: 0, y: 0 } },
+    positions: [],
+    hash: id,
+  };
+}
 
 // ─── buildSymbolMap (local re-implementation) ────────────────────────────────
 
@@ -29,7 +42,7 @@ describe('buildSymbolMap', () => {
   it('deve mapear symbol IDs para ImageData', () => {
     const imageData = { width: 10, height: 10 } as ImageData;
     const symbols: ExtractedSymbol[] = [
-      { id: 'sym1', imageData },
+      makeSymbol('sym1', imageData),
     ];
     const map = buildSymbolMap(symbols);
     expect(map.get('sym1')).toBe(imageData);
@@ -37,9 +50,9 @@ describe('buildSymbolMap', () => {
 
   it('deve pular símbolos sem imageData', () => {
     const symbols: ExtractedSymbol[] = [
-      { id: 'sym1', imageData: undefined },
-      { id: 'sym2', imageData: { width: 5, height: 5 } as ImageData },
-    ];
+      { ...makeSymbol('sym1', {} as ImageData), imageData: undefined },
+      makeSymbol('sym2', { width: 5, height: 5 } as ImageData),
+    ] as ExtractedSymbol[];
     const map = buildSymbolMap(symbols);
     expect(map.has('sym1')).toBe(false);
     expect(map.has('sym2')).toBe(true);
@@ -49,8 +62,8 @@ describe('buildSymbolMap', () => {
     const img1 = { width: 10, height: 10 } as ImageData;
     const img2 = { width: 20, height: 20 } as ImageData;
     const symbols: ExtractedSymbol[] = [
-      { id: 'sym1', imageData: img1 },
-      { id: 'sym1', imageData: img2 },
+      makeSymbol('sym1', img1),
+      makeSymbol('sym1', img2),
     ];
     const map = buildSymbolMap(symbols);
     expect(map.get('sym1')).toBe(img2);

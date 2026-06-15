@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PuzzleCell } from '@/components/PuzzleCell/PuzzleCell';
-import type { GridCell } from '@/types';
+import type { GridCell } from '@/types/grid';
 
 function makeCell(overrides: Partial<GridCell> = {}): GridCell {
   return {

@@ -1,8 +1,8 @@
 /**
  * Utilitários compartilhados entre testes
  */
-import type { ProcessedData, UniqueSymbol, ExtractedSymbol } from '@/types';
-import type { SymbolFeatures } from '@/types/symbol';
+import type { ProcessedData } from '@/types/puzzle';
+import type { UniqueSymbol, ExtractedSymbol, SymbolFeatures } from '@/types/symbol';
 
 /** Cria um ImageData válido de NxN pixels para uso em testes */
 export function makeImageData(width = 8, height = 8): ImageData {

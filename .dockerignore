@@ -1,0 +1,14 @@
+ocr-service/models/
+backend/node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+dist/
+build/
+*.zip
+real_cells/
+pseudo_labeled/
+synthetic_data/
+all_data/

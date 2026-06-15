@@ -1,5 +1,5 @@
 // src/components/CluePanel/CluePanel.tsx
-import type { ClueResult } from '@/types';
+import type { ClueResult } from '@/types/ocr';
 import './CluePanel.css';
 
 interface CluePanelProps {

@@ -1,58 +1,60 @@
 // src/pages/ProcessingPage.tsx
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useImageProcessor } from '@/hooks';
-import { usePuzzleStore } from '@/store/puzzleStore';
-import type { ProcessedData, UniqueSymbol, ExtractedSymbol } from '@/types';
+import { Settings, XCircle, CheckCircle, FileText, ClipboardList, Image as ImageIcon } from 'lucide-react';
+import { useImageProcessor } from '@/hooks/useImageProcessor';
+import { useImageStore } from '@/store/useImageStore';
+import { useGridStore } from '@/store/useGridStore';
+import { useOCRStore } from '@/store/useOCRStore';
+import type { UniqueSymbol, ExtractedSymbol } from '@/types/symbol';
 
 export function ProcessingPage() {
-  const [imageData, setImageData] = useState<ImageData | null>(null);
-  const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
+  const imageData = useImageStore((s) => s.imageData);
+  const setPreprocessedImage = useImageStore((s) => s.setPreprocessedImage);
+  const setGrid = useGridStore((s) => s.setGrid);
+  const setTableStructure = useGridStore((s) => s.setTableStructure);
+  const setExtractedSymbols = useGridStore((s) => s.setExtractedSymbols);
+  const setUniqueSymbols = useGridStore((s) => s.setUniqueSymbols);
+  const setUsedFallback = useGridStore((s) => s.setUsedFallback);
+  const tableStructure = useGridStore((s) => s.tableStructure);
+  const extractedSymbols = useGridStore((s) => s.extractedSymbols);
+  const uniqueSymbols = useGridStore((s) => s.uniqueSymbols);
+  const clues = useOCRStore((s) => s.clues);
+  const setCellNumbers = useOCRStore((s) => s.setCellNumbers);
+  const setClues = useOCRStore((s) => s.setClues);
   const { processImage, status } = useImageProcessor();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedPreview = sessionStorage.getItem('uploadedImagePreview');
-    if (!storedPreview) {
-      navigate('/');
-      return;
-    }
-
-    convertBase64ToImageData(storedPreview)
-      .then((imgData) => {
-        setImageData(imgData);
-      })
-      .catch((error) => {
-        console.error('Erro ao converter imagem:', error);
-        alert('Erro ao carregar imagem. Tente fazer upload novamente.');
-        navigate('/');
-      });
-  }, [navigate]);
-
-  useEffect(() => {
-    if (imageData && !processedData) {
+    if (imageData && status.stage === 'idle') {
       handleProcess();
     }
-  }, [imageData, processedData]);
+  }, [imageData, status.stage]);
 
   const handleProcess = async () => {
     if (!imageData) return;
     try {
       const result = await processImage(imageData);
       if (result.uniqueSymbols.length === 0) {
-        console.warn('⚠️ Processamento retornou 0 símbolos');
-        console.log('📝 Usando dados mock para teste da interface');
+        console.warn('Processamento retornou 0 símbolos');
+        console.log('Usando dados mock para teste da interface');
         result.uniqueSymbols = generateMockSymbols();
         result.extractedSymbols = generateMockExtracted();
       }
-      setProcessedData(result);
+      setPreprocessedImage(result.preprocessedImage);
+      setGrid(result.grid);
+      setTableStructure(result.tableStructure);
+      setExtractedSymbols(result.extractedSymbols);
+      setUniqueSymbols(result.uniqueSymbols);
+      setUsedFallback(false);
+      setCellNumbers(result.cellNumbers);
+      setClues(result.clues);
     } catch (error) {
       console.error('Erro no processamento:', error);
     }
   };
 
   const handleBack = () => {
-    sessionStorage.removeItem('uploadedImagePreview');
     navigate('/');
   };
 
@@ -69,27 +71,6 @@ export function ProcessingPage() {
     };
     return labels[stage] || stage;
   };
-
-  async function convertBase64ToImageData(base64: string): Promise<ImageData> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Não foi possível criar contexto 2D'));
-          return;
-        }
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        resolve(imageData);
-      };
-      img.onerror = () => reject(new Error('Erro ao carregar imagem'));
-      img.src = base64;
-    });
-  }
 
   function generateMockSymbols(): UniqueSymbol[] {
     const symbols: UniqueSymbol[] = [];
@@ -128,7 +109,6 @@ export function ProcessingPage() {
     const extracted: ExtractedSymbol[] = [];
     for (let row = 0; row < 5; row++) {
       for (let col = 1; col < 6; col++) {
-        const symbolIndex = (row + col) % 10;
         const canvas = document.createElement('canvas');
         canvas.width = 30; canvas.height = 30;
         extracted.push({
@@ -147,137 +127,108 @@ export function ProcessingPage() {
     return extracted;
   }
 
+  const isComplete = status.stage === 'complete' && tableStructure;
+
   return (
-    <div style={styles.container}>
-      <button onClick={handleBack} style={styles.backButton}>
+    <div className="max-w-3xl mx-auto py-10 px-5 font-sans">
+      <button
+        onClick={handleBack}
+        className="bg-none border border-border px-4 py-2 rounded-input cursor-pointer text-sm text-ink-muted hover:bg-surface-subtle transition-colors mb-6"
+      >
         ← Voltar
       </button>
 
-      <h1 style={styles.title}>⚙️ Processando Criptograma</h1>
+      <h1 className="text-3xl font-bold mb-8 text-ink flex items-center">
+        <Settings size={28} className="mr-2" />Processando Criptograma
+      </h1>
 
-      <div style={styles.statusCard}>
-        <div style={styles.statusHeader}>
-          <h2 style={styles.statusTitle}>
+      <div className="bg-surface-card border border-border-light rounded-card p-8 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold text-ink m-0">
             {getStageLabel(status.stage)}
           </h2>
-          <span style={styles.statusPercentage}>
+          <span className="text-3xl font-bold text-primary">
             {status.progress.toFixed(0)}%
           </span>
         </div>
 
-        <div style={styles.progressBar}>
+        <div className="w-full h-3 bg-border rounded-full overflow-hidden mb-4">
           <div
-            style={{
-              ...styles.progressFill,
-              width: `${status.progress}%`,
-            }}
+            className="h-full bg-primary transition-all duration-300 ease-in-out"
+            style={{ width: `${status.progress}%` }}
           />
         </div>
 
         {status.currentStep && (
-          <p style={styles.currentStep}>{status.currentStep}</p>
+          <p className="text-sm text-ink-muted m-0">{status.currentStep}</p>
         )}
 
         {status.error && (
-          <div style={styles.errorBox}>
-            <strong>❌ Erro:</strong> {status.error.message}
+          <div className="bg-error/10 border border-error/30 rounded-input px-4 py-3 text-error text-sm mt-4 flex items-center">
+            <XCircle size={16} className="mr-1.5 flex-shrink-0" />
+            <strong>Erro:</strong> {status.error.message}
           </div>
         )}
       </div>
 
-      {status.stage === 'complete' && processedData && (
-        <div style={styles.resultsCard}>
-          <h2 style={styles.resultsTitle}>✅ Processamento Concluído!</h2>
+      {isComplete && (
+        <div className="bg-success/5 border-2 border-success rounded-card p-8 mb-6">
+          <h2 className="text-2xl font-semibold text-success-text mb-6 flex items-center">
+            <CheckCircle size={22} className="mr-2" />Processamento Concluído!
+          </h2>
 
-          <div style={styles.resultsGrid}>
-            <div style={styles.resultItem}>
-              <div style={styles.resultLabel}>Estrutura da Tabela</div>
-              <div style={styles.resultValue}>
-                {processedData.tableStructure.rows} × {processedData.tableStructure.cols}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Estrutura da Tabela', value: `${tableStructure!.rows} × ${tableStructure!.cols}` },
+              { label: 'Pistas Reconhecidas', value: String(clues.length) },
+              { label: 'Símbolos Extraídos', value: String(extractedSymbols.length) },
+              { label: 'Símbolos Únicos', value: String(uniqueSymbols.length) },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-surface-card p-4 rounded-input border border-border">
+                <div className="text-xs text-ink-muted mb-2 uppercase font-semibold">{label}</div>
+                <div className="text-2xl font-bold text-ink">{value}</div>
               </div>
-            </div>
-
-            <div style={styles.resultItem}>
-              <div style={styles.resultLabel}>Pistas Reconhecidas</div>
-              <div style={styles.resultValue}>
-                {processedData.clues.length}
-              </div>
-            </div>
-
-            <div style={styles.resultItem}>
-              <div style={styles.resultLabel}>Símbolos Extraídos</div>
-              <div style={styles.resultValue}>
-                {processedData.extractedSymbols.length}
-              </div>
-            </div>
-
-            <div style={styles.resultItem}>
-              <div style={styles.resultLabel}>Símbolos Únicos</div>
-              <div style={styles.resultValue}>
-                {processedData.uniqueSymbols.length}
-              </div>
-            </div>
+            ))}
           </div>
 
-          <div style={styles.cluesSection}>
-            <h3 style={styles.cluesTitle}>📝 Pistas Reconhecidas</h3>
-            <div style={styles.cluesList}>
-              {processedData.clues.slice(0, 5).map((clue) => (
-                <div key={clue.row} style={styles.clueItem}>
-                  <span style={styles.clueNumber}>#{clue.row + 1}</span>
-                  <span style={styles.clueText}>
+          <div className="bg-surface-card p-5 rounded-input border border-border mb-6">
+            <h3 className="text-lg font-semibold mb-4 text-ink flex items-center">
+              <FileText size={18} className="mr-2" />Pistas Reconhecidas
+            </h3>
+            <div className="flex flex-col gap-2">
+              {clues.slice(0, 5).map((clue) => (
+                <div key={clue.row} className="flex items-center gap-3 px-3 py-2 bg-surface-subtle rounded-input">
+                  <span className="text-xs font-semibold text-primary min-w-10">#{clue.row + 1}</span>
+                  <span className="flex-1 text-sm text-ink">
                     {clue.text || '(vazio)'}
                   </span>
-                  <span style={styles.clueConfidence}>
+                  <span className="text-xs text-ink-muted font-medium">
                     {(clue.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
               ))}
-              {processedData.clues.length > 5 && (
-                <p style={styles.cluesMore}>
-                  ... e mais {processedData.clues.length - 5} pistas
+              {clues.length > 5 && (
+                <p className="text-sm text-ink-faint italic mt-2">
+                  ... e mais {clues.length - 5} pistas
                 </p>
               )}
             </div>
           </div>
 
-          <button 
-            style={styles.continueButton}
-            onClick={() => {
-              sessionStorage.setItem(
-                'processedSymbols:v1',
-                JSON.stringify(processedData.uniqueSymbols)
-              );
-              // Salva os dados completos para o MappingPage montar o PuzzleState
-              // (ImageData não é serializável — omitimos preprocessedImage)
-              try {
-                const serializable = {
-                  ...processedData,
-                  preprocessedImage: null,
-                  extractedSymbols: processedData.extractedSymbols.map((s) => ({
-                    ...s,
-                    imageData: null,
-                  })),
-                  uniqueSymbols: processedData.uniqueSymbols.map((u) => ({
-                    ...u,
-                    representative: { ...u.representative, imageData: null },
-                  })),
-                };
-                sessionStorage.setItem('processedData', JSON.stringify(serializable));
-              } catch {
-                // silencioso — processedData é opcional
-              }
-              navigate('/mapping');
-            }}
+          <button
+            className="w-full py-4 text-base font-semibold text-white bg-primary rounded-input hover:bg-primary-hover transition-colors flex items-center justify-center"
+            onClick={() => navigate('/mapping')}
           >
-            📋 Ir para Mapeamento →
+            <ClipboardList size={18} className="mr-2" />Ir para Mapeamento →
           </button>
         </div>
       )}
 
       {imageData && (
-        <div style={styles.debugSection}>
-          <h3 style={styles.debugTitle}>🖼️ Imagem Original</h3>
+        <div className="bg-surface-subtle p-6 rounded-card border border-border-light">
+          <h3 className="text-lg font-semibold mb-4 text-ink flex items-center">
+            <ImageIcon size={18} className="mr-2" />Imagem Original
+          </h3>
           <canvas
             ref={(canvas) => {
               if (canvas && imageData) {
@@ -287,42 +238,10 @@ export function ProcessingPage() {
                 if (ctx) ctx.putImageData(imageData, 0, 0);
               }
             }}
-            style={styles.debugCanvas}
+            className="w-full h-auto border border-border rounded-input mb-2"
           />
         </div>
       )}
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: { maxWidth: '900px', margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui, sans-serif' },
-  backButton: { background: 'none', border: '1px solid #ccc', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', color: '#666', marginBottom: '24px' },
-  title: { fontSize: '32px', fontWeight: 'bold', marginBottom: '32px', color: '#1a1a1a' },
-  statusCard: { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '32px', marginBottom: '24px' },
-  statusHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' },
-  statusTitle: { fontSize: '24px', fontWeight: '600', color: '#1a1a1a', margin: 0 },
-  statusPercentage: { fontSize: '32px', fontWeight: 'bold', color: '#667eea' },
-  progressBar: { width: '100%', height: '12px', backgroundColor: '#e0e0e0', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' },
-  progressFill: { height: '100%', backgroundColor: '#667eea', transition: 'width 0.3s ease' },
-  currentStep: { fontSize: '14px', color: '#666', margin: 0 },
-  errorBox: { backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '8px', padding: '12px 16px', color: '#c33', fontSize: '14px', marginTop: '16px' },
-  resultsCard: { backgroundColor: '#f8fffe', border: '2px solid #4ade80', borderRadius: '12px', padding: '32px', marginBottom: '24px' },
-  resultsTitle: { fontSize: '24px', fontWeight: '600', color: '#166534', marginBottom: '24px' },
-  resultsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' },
-  resultItem: { backgroundColor: '#fff', padding: '16px', borderRadius: '8px', border: '1px solid #e0e0e0' },
-  resultLabel: { fontSize: '12px', color: '#666', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '600' },
-  resultValue: { fontSize: '24px', fontWeight: 'bold', color: '#1a1a1a' },
-  cluesSection: { backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e0e0e0', marginBottom: '24px' },
-  cluesTitle: { fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1a1a1a' },
-  cluesList: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  clueItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', backgroundColor: '#f8f9fa', borderRadius: '6px' },
-  clueNumber: { fontSize: '12px', fontWeight: '600', color: '#667eea', minWidth: '40px' },
-  clueText: { flex: 1, fontSize: '14px', color: '#333' },
-  clueConfidence: { fontSize: '12px', color: '#666', fontWeight: '500' },
-  cluesMore: { fontSize: '14px', color: '#999', fontStyle: 'italic', marginTop: '8px' },
-  continueButton: { width: '100%', padding: '16px 24px', fontSize: '16px', fontWeight: '600', color: '#fff', backgroundColor: '#667eea', border: 'none', borderRadius: '8px', cursor: 'pointer' },
-  debugSection: { backgroundColor: '#f8f9fa', padding: '24px', borderRadius: '12px', border: '1px solid #e0e0e0' },
-  debugTitle: { fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1a1a1a' },
-  debugCanvas: { width: '100%', height: 'auto', border: '1px solid #ccc', borderRadius: '8px', marginBottom: '8px' },
-};

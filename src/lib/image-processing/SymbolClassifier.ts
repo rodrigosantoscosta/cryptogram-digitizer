@@ -11,7 +11,7 @@ import type {
   CellPosition,
   UniqueSymbol,
   SymbolCluster
-} from '@/types';
+} from '@/types/symbol';
 import type { CellNumberMap } from '@/lib/ocr/CellNumberReader';
 
 export class SymbolClassifier {
@@ -397,7 +397,7 @@ export class SymbolClassifier {
 
 // ─── Helpers privados do módulo ─────────────────────────────────────────────────────
 
-function makeBlankFeatures(): import('@/types').SymbolFeatures {
+function makeBlankFeatures(): import('@/types/symbol').SymbolFeatures {
   return {
     area: 0,
     perimeter: 0,

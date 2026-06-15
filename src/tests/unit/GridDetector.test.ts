@@ -73,7 +73,7 @@ const cvMock = {
     out.delete = mock.delete;
   }),
   matFromImageData: vi.fn(() => makeMockMat({ channels: 4, rows: 300, cols: 300 })),
-  Mat: vi.fn(() => makeMockMat()),
+  Mat: vi.fn(function() { return makeMockMat(); }),
   // Used by detectByContours / detectByMorphology fallbacks
   threshold: vi.fn(),
   findContours: vi.fn(),
@@ -94,13 +94,13 @@ const cvMock = {
   bitwise_not: vi.fn(),
   erode: vi.fn(),
   dilate: vi.fn(),
-  Size: vi.fn((w: number, h: number) => ({ width: w, height: h })),
-  Rect: vi.fn((x: number, y: number, w: number, h: number) => ({ x, y, width: w, height: h })),
-  Point: vi.fn((x: number, y: number) => ({ x, y })),
-  Scalar: vi.fn((...args: number[]) => args),
+  Size: vi.fn(function(w: number, h: number) { return { width: w, height: h }; }),
+  Rect: vi.fn(function(x: number, y: number, w: number, h: number) { return { x, y, width: w, height: h }; }),
+  Point: vi.fn(function(x: number, y: number) { return { x, y }; }),
+  Scalar: vi.fn(function(...args: number[]) { return args; }),
   line: vi.fn(),
   imshow: vi.fn(),
-  MatVector: vi.fn(() => ({ size: () => 0, get: vi.fn(), delete: vi.fn() })),
+  MatVector: vi.fn(function() { return { size: () => 0, get: vi.fn(), delete: vi.fn() }; }),
 };
 
 // Injetar mock no escopo global antes de importar GridDetector
@@ -130,7 +130,7 @@ describe('GridDetector — detectByHoughIntersection (via detect())', () => {
       const mock = makeMockLinesOut();
       out.rows = mock.rows; out.data32S = mock.data32S; out.delete = mock.delete;
     });
-    cvMock.Mat.mockImplementation(() => makeMockMat({ rows: 300, cols: 300 }));
+    cvMock.Mat.mockImplementation(function() { return makeMockMat({ rows: 300, cols: 300 }); });
     cvMock.matFromImageData.mockImplementation(() =>
       makeMockMat({ channels: 4, rows: 300, cols: 300 })
     );
@@ -218,17 +218,17 @@ describe('GridDetector — fallback quando Hough falha', () => {
     cvMock.HoughLinesP.mockImplementation((_edges: any, out: any) => {
       out.rows = 0; out.data32S = []; out.delete = vi.fn();
     });
-    cvMock.Mat.mockImplementation(() => makeMockMat());
+    cvMock.Mat.mockImplementation(function() { return makeMockMat(); });
     cvMock.matFromImageData.mockImplementation(() =>
       makeMockMat({ channels: 4, rows: 300, cols: 300 })
     );
 
     // findContours retorna 0 contornos → cai no morfológico
-    cvMock.MatVector.mockImplementation(() => ({
+    cvMock.MatVector.mockImplementation(function() { return {
       size: () => 0,
       get: vi.fn(),
       delete: vi.fn(),
-    }));
+    }; });
 
     // Morfológico vai falhar também sem dados reais — apenas verificar que
     // o pipeline não quebra silenciosamente (lança erro gerenciado)

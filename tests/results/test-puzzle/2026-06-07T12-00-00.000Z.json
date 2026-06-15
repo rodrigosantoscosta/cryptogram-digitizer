@@ -1,0 +1,16 @@
+{
+  "puzzleId": "test-puzzle",
+  "timestamp": "2026-06-07T12:00:00.000Z",
+  "cells": [],
+  "metrics": {
+    "accuracy": 0.95,
+    "precision": 0.95,
+    "recall": 0.95,
+    "f1Score": 0.95,
+    "coverage": 1,
+    "editDistance": 1,
+    "normalizedEditDistance": 0.01,
+    "perDigit": {}
+  },
+  "aborted": false
+}

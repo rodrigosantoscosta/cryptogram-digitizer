@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { GridResult, TableStructure } from '@/types';
+import type { GridResult, TableStructure } from '@/types/image';
 
 // ─── Re-implementação local (funções não exportadas) ──────────────────────────
 

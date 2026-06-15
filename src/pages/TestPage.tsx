@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Camera, CheckCircle, Waves, Ruler, Square, Grid3X3, Beaker } from 'lucide-react';
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 
 export function TestPage() {
@@ -9,7 +10,6 @@ export function TestPage() {
   const [error, setError] = useState<string | null>(null);
   const [detectorLogs, setDetectorLogs] = useState<Array<{ text: string; type: 'success' | 'warn' | 'info' }>>([]);
 
-  /** Intercepta console.log/warn durante o processamento para capturar logs do GridDetector */
   const withLogCapture = (fn: () => Promise<void>) => {
     const logs: Array<{ text: string; type: 'success' | 'warn' | 'info' }> = [];
     const origLog  = console.log.bind(console);
@@ -61,7 +61,7 @@ export function TestPage() {
           setResult(data);
 
           try {
-            const { GridDetector } = await import('@/lib/image-processing');
+            const { GridDetector } = await import('@/lib/image-processing/GridDetector');
             const vizData = GridDetector.visualize(data.preprocessedImage, data.grid);
             const vizCanvas = document.createElement('canvas');
             vizCanvas.width  = vizData.width;
@@ -90,48 +90,38 @@ export function TestPage() {
     error: '#ef4444',
   };
 
-  // Derivar qual abordagem venceu a partir dos logs capturados
   const winnerLog = detectorLogs.find(l => l.type === 'success' && l.text.includes('✓'));
   const fftPeriodLog = detectorLogs.find(l => l.text.includes('[GridDetector/FFT]'));
 
   return (
-    <div style={{ padding: '24px', maxWidth: '960px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      <h1 style={{ fontSize: '22px', marginBottom: '4px' }}>🧪 Teste do Pipeline — GridDetector</h1>
-      <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
+    <div className="py-6 px-6 max-w-4xl mx-auto font-sans">
+      <h1 className="text-xl mb-1 flex items-center gap-2">
+        <Beaker size={22} />Teste do Pipeline — GridDetector
+      </h1>
+      <p className="text-xs text-ink-muted mb-5">
         Cadeia: <strong>FFT</strong> → Hough → Contornos → Morfologia
       </p>
 
       <input type="file" accept="image/*" onChange={handleFileUpload}
-        style={{ display: 'block', marginBottom: '20px', fontSize: '15px' }} />
+        className="block mb-5 text-sm" />
 
       {/* Barra de progresso */}
-      <div style={{ marginBottom: '20px', padding: '12px', background: '#f3f4f6', borderRadius: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{
-            padding: '2px 10px',
-            borderRadius: '99px',
-            fontSize: '13px',
-            fontWeight: 600,
-            background: stageColor[status.stage] ?? '#888',
-            color: '#fff'
-          }}>{status.stage}</span>
-          <span style={{ fontSize: '14px', color: '#444' }}>{status.currentStep}</span>
-          <span style={{ marginLeft: 'auto', fontSize: '13px', color: '#888' }}>{status.progress}%</span>
+      <div className="mb-5 p-3 bg-gray-100 rounded-input">
+        <div className="flex items-center gap-2.5">
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold text-white"
+            style={{ background: stageColor[status.stage] ?? '#888' }}>{status.stage}</span>
+          <span className="text-sm text-ink">{status.currentStep}</span>
+          <span className="ml-auto text-xs text-ink-faint">{status.progress}%</span>
         </div>
-        <div style={{ marginTop: '6px', height: '4px', background: '#e5e7eb', borderRadius: '2px' }}>
-          <div style={{
-            height: '100%',
-            width: `${status.progress}%`,
-            background: stageColor[status.stage] ?? '#888',
-            borderRadius: '2px',
-            transition: 'width 0.3s'
-          }} />
+        <div className="mt-1.5 h-1 bg-gray-200 rounded-sm">
+          <div className="h-full rounded-sm transition-all duration-300"
+            style={{ width: `${status.progress}%`, background: stageColor[status.stage] ?? '#888' }} />
         </div>
         {(status.error || error) && (
-          <div style={{ color: '#ef4444', marginTop: '6px', fontSize: '13px' }}>
+          <div className="text-error mt-1.5 text-xs">
             <p><strong>Erro:</strong> {status.error?.message ?? error}</p>
             {status.error?.stack && (
-              <pre style={{ fontSize: '10px', marginTop: '4px', overflowX: 'auto', background: '#fee2e2', padding: '8px' }}>
+              <pre className="text-xs mt-1 overflow-x-auto bg-red-50 p-2 rounded-sm">
                 {status.error.stack}
               </pre>
             )}
@@ -141,17 +131,17 @@ export function TestPage() {
 
       {/* Imagens lado a lado */}
       {(originalUrl || visualizeUrl) && (
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 mb-5 flex-wrap">
           {originalUrl && (
-            <div style={{ flex: 1, minWidth: '300px' }}>
-              <p style={{ fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>📷 Original</p>
-              <img src={originalUrl} style={{ width: '100%', borderRadius: '6px', border: '1px solid #e5e7eb' }} alt="original" />
+            <div className="flex-1 min-w-72">
+              <p className="font-semibold mb-1.5 text-sm flex items-center gap-1.5"><Camera size={16} />Original</p>
+              <img src={originalUrl} className="w-full rounded-input border border-gray-200" alt="original" />
             </div>
           )}
           {visualizeUrl && (
-            <div style={{ flex: 1, minWidth: '300px' }}>
-              <p style={{ fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>🟩 Grade Detectada</p>
-              <img src={visualizeUrl} style={{ width: '100%', borderRadius: '6px', border: '1px solid #e5e7eb' }} alt="grade" />
+            <div className="flex-1 min-w-72">
+              <p className="font-semibold mb-1.5 text-sm flex items-center gap-1.5"><Grid3X3 size={16} />Grade Detectada</p>
+              <img src={visualizeUrl} className="w-full rounded-input border border-gray-200" alt="grade" />
             </div>
           )}
         </div>
@@ -159,43 +149,36 @@ export function TestPage() {
 
       {/* Painel de diagnóstico do GridDetector */}
       {detectorLogs.length > 0 && (
-        <div style={{ marginBottom: '20px', background: '#0f172a', borderRadius: '8px', padding: '14px' }}>
-          <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '8px', fontFamily: 'monospace' }}>
+        <div className="mb-5 bg-slate-900 rounded-input p-3.5">
+          <p className="text-slate-400 text-xs mb-2 font-mono">
             ▶ GridDetector — logs de detecção
           </p>
           {detectorLogs.map((l, i) => (
-            <div key={i} style={{
-              fontFamily: 'monospace',
-              fontSize: '12px',
-              padding: '2px 0',
-              color: l.type === 'success' ? '#4ade80' : l.type === 'warn' ? '#facc15' : '#94a3b8',
-            }}>
+            <div key={i} className={`
+              font-mono text-xs py-0.5
+              ${l.type === 'success' ? 'text-green-400' : l.type === 'warn' ? 'text-yellow-400' : 'text-slate-400'}
+            `}>
               {l.text}
             </div>
           ))}
 
-          {/* Badge da abordagem vencedora */}
           {winnerLog && (
-            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Método usado:</span>
-              <span style={{
-                padding: '2px 10px',
-                borderRadius: '99px',
-                fontSize: '12px',
-                fontWeight: 700,
-                background: winnerLog.text.includes('FFT') ? '#0ea5e9'
-                  : winnerLog.text.includes('Hough') ? '#f97316'
-                  : winnerLog.text.includes('contornos') ? '#a855f7'
-                  : '#6b7280',
-                color: '#fff',
-              }}>
-                {winnerLog.text.includes('FFT') ? '📡 FFT Projeção'
-                  : winnerLog.text.includes('Hough') ? '📐 Hough+Interseção'
-                  : winnerLog.text.includes('contornos') ? '⬜ Contornos'
-                  : '🔲 Morfologia'}
+            <div className="mt-2.5 flex gap-2 items-center">
+              <span className="text-xs text-slate-400">Método usado:</span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white"
+                style={{
+                  background: winnerLog.text.includes('FFT') ? '#0ea5e9'
+                    : winnerLog.text.includes('Hough') ? '#f97316'
+                    : winnerLog.text.includes('contornos') ? '#a855f7'
+                    : '#6b7280',
+                }}>
+                {winnerLog.text.includes('FFT') ? <><Waves size={12} className="inline mr-1" />FFT Projeção</>
+                  : winnerLog.text.includes('Hough') ? <><Ruler size={12} className="inline mr-1" />Hough+Interseção</>
+                  : winnerLog.text.includes('contornos') ? <><Square size={12} className="inline mr-1" />Contornos</>
+                  : <><Grid3X3 size={12} className="inline mr-1" />Morfologia</>}
               </span>
               {fftPeriodLog && (
-                <span style={{ fontSize: '11px', color: '#67e8f9', fontFamily: 'monospace' }}>
+                <span className="text-xs text-cyan-300 font-mono">
                   {fftPeriodLog.text.replace('[GridDetector/FFT]', '').trim()}
                 </span>
               )}
@@ -206,9 +189,9 @@ export function TestPage() {
 
       {/* Estatísticas do resultado */}
       {result && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '16px' }}>
-          <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#065f46' }}>✅ Resultado</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-input p-4">
+          <h2 className="text-base mb-3 text-emerald-800 flex items-center gap-2"><CheckCircle size={18} />Resultado</h2>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2.5 mb-3">
             {[
               { label: 'Linhas',            value: result.grid?.rows ?? '—' },
               { label: 'Colunas',           value: result.grid?.cols ?? '—' },
@@ -216,28 +199,15 @@ export function TestPage() {
               { label: 'Símbolos extraídos',value: result.extractedSymbols?.length ?? '—' },
               { label: 'Símbolos únicos',   value: result.uniqueSymbols?.length ?? '—' },
             ].map(({ label, value }) => (
-              <div key={label} style={{
-                background: '#fff',
-                borderRadius: '6px',
-                padding: '10px',
-                border: '1px solid #d1fae5',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#059669' }}>{value}</div>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>{label}</div>
+              <div key={label} className="bg-surface-card rounded-input p-2.5 border border-emerald-100 text-center">
+                <div className="text-xl font-bold text-emerald-600">{value}</div>
+                <div className="text-xs text-ink-muted">{label}</div>
               </div>
             ))}
           </div>
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: '13px', color: '#065f46' }}>Ver JSON do grid</summary>
-            <pre style={{
-              fontSize: '11px',
-              marginTop: '8px',
-              overflowX: 'auto',
-              background: '#ecfdf5',
-              padding: '8px',
-              borderRadius: '4px'
-            }}>
+            <summary className="cursor-pointer text-xs text-emerald-800">Ver JSON do grid</summary>
+            <pre className="text-xs mt-2 overflow-x-auto bg-emerald-50 p-2 rounded-sm">
               {JSON.stringify(result.grid, null, 2)}
             </pre>
           </details>

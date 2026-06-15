@@ -1,5 +1,6 @@
 // src/lib/image-processing/SymbolMapper.ts
-import type { UniqueSymbol, SymbolMapping, SymbolSuggestion, GridCell } from '@/types';
+import type { UniqueSymbol, SymbolMapping, SymbolSuggestion } from '@/types/symbol';
+import type { GridCell } from '@/types/grid';
 
 export const PORTUGUESE_LETTER_FREQUENCY: Record<string, number> = {
   'A': 14.63, 'E': 12.57, 'O': 10.73, 'S': 7.81,

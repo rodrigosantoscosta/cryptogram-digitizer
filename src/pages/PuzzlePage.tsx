@@ -1,6 +1,7 @@
 // src/pages/PuzzlePage.tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Check, ArrowLeft, Trash2 } from 'lucide-react';
 import { PuzzleGrid } from '@/components/PuzzleGrid';
 import { CluePanel } from '@/components/CluePanel';
 import { usePuzzleSolver } from '@/hooks/usePuzzleSolver';
@@ -57,9 +58,7 @@ function PuzzleHeader({
     <header className="puzzle-header">
       <div className="puzzle-header__left">
         <button className="puzzle-header__btn" onClick={onBack} aria-label="Voltar ao mapeamento">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ArrowLeft size={16} aria-hidden="true" />
           Mapeamento
         </button>
       </div>
@@ -78,9 +77,7 @@ function PuzzleHeader({
           onClick={onReset}
           aria-label="Limpar respostas"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M1 4h12M5 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4M2.5 4l.7 7.5a.5.5 0 00.5.5h6.6a.5.5 0 00.5-.5L11.5 4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Trash2 size={14} aria-hidden="true" />
           Limpar
         </button>
       </div>
@@ -92,7 +89,7 @@ function CompletionBanner({ onNewPuzzle }: { onNewPuzzle: () => void }) {
   return (
     <div className="puzzle-completion" role="status" aria-live="polite">
       <div className="puzzle-completion__inner">
-        <span className="puzzle-completion__icon" aria-hidden="true">✓</span>
+        <span className="puzzle-completion__icon" aria-hidden="true"><Check size={28} /></span>
         <div>
           <p className="puzzle-completion__title">Criptograma resolvido!</p>
           <p className="puzzle-completion__sub">Todas as letras foram preenchidas.</p>

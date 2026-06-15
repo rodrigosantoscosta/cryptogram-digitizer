@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Type, Trash2, CheckCircle, ArrowLeft } from 'lucide-react';
 import { PuzzleGrid } from '../components/PuzzleGrid';
 import { CluePanel } from '../components/CluePanel';
 import { usePuzzleSolver } from '../hooks/usePuzzleSolver';
 import { usePuzzleNavigation } from '../hooks/usePuzzleNavigation';
-import type { ProcessedData } from '../types/index';
+import type { ProcessedData } from '@/types/puzzle';
 import type { SymbolMapping } from '../types/symbol';
 
 const BASE_CELL_SIZE = 44;
@@ -32,7 +33,6 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
 
   const { clues, extractedSymbols } = processedData;
 
-  // Build initial grid from extractedSymbols
   const initialGrid = buildGrid(processedData);
   const colCount = initialGrid[0]?.length ?? 9;
   const rowCount = initialGrid.length;
@@ -42,19 +42,16 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
   const { activeRow, activeCol, correctCells, handleCellFocus, handleCellChange, handleCellKeyDown } =
     usePuzzleNavigation();
 
-  // Timer
   useEffect(() => {
     if (isComplete) return;
     const id = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, [isComplete]);
 
-  // Completion detection
   useEffect(() => {
     if (progress >= 100 && !isComplete) setIsComplete(true);
   }, [progress, isComplete]);
 
-  // Responsive cell size
   useEffect(() => {
     const measure = () => {
       if (containerRef.current) {
@@ -81,44 +78,53 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
   const secs = String(elapsedSeconds % 60).padStart(2, '0');
 
   return (
-    <div style={s.page} ref={containerRef}>
+    <div className="flex flex-col min-h-[70vh]" ref={containerRef}>
       {/* Header */}
-      <header style={s.header}>
-        <div style={s.headerLeft}>
-          <button style={s.headerBtn} onClick={onBack}>← Mapeamento</button>
+      <header className="flex items-center justify-between bg-surface-card border border-border rounded-card px-5 py-3 mb-5">
+        <div className="flex-1">
+          <button
+            className="bg-none border border-border rounded-input px-3 py-1.5 cursor-pointer text-xs text-ink-muted hover:bg-surface-subtle transition-colors flex items-center gap-1.5"
+            onClick={onBack}
+          >
+            <ArrowLeft size={14} />Mapeamento
+          </button>
         </div>
-        <div style={s.headerCenter}>
-          <span style={s.headerLogo}>🔤 Criptograma</span>
-          <div style={s.progressWrap}>
-            <div style={s.progressTrack}>
-              <div style={{ ...s.progressFill, width: `${progress}%` }} />
+        <div className="flex-2 flex flex-col items-center gap-1">
+          <span className="text-base font-bold text-ink flex items-center gap-1">
+            <Type size={18} />Criptograma
+          </span>
+          <div className="flex items-center gap-2 w-45">
+            <div className="flex-1 h-1.5 bg-border rounded-sm overflow-hidden">
+              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
             </div>
-            <span style={s.progressLabel}>{Math.round(progress)}%</span>
+            <span className="text-xs text-primary font-bold min-w-8">{Math.round(progress)}%</span>
           </div>
         </div>
-        <div style={s.headerRight}>
-          <span style={s.timer}>{mins}:{secs}</span>
+        <div className="flex-1 flex items-center justify-end gap-3">
+          <span className="text-xs font-semibold text-ink-muted tabular-nums">{mins}:{secs}</span>
           <button
-            style={s.dangerBtn}
+            className="bg-none border border-red-200 rounded-input px-3 py-1.5 cursor-pointer text-xs text-error hover:bg-error/10 transition-colors flex items-center gap-1"
             onClick={() => { if (window.confirm('Limpar todas as respostas?')) { clearGrid(); setIsComplete(false); setElapsedSeconds(0); } }}
           >
-            🗑 Limpar
+            <Trash2 size={14} />Limpar
           </button>
         </div>
       </header>
 
       {/* Completion banner */}
       {isComplete && (
-        <div style={s.completionBanner}>
-          <span>✅ Criptograma resolvido! Todas as letras foram preenchidas.</span>
-          <button style={s.newPuzzleBtn} onClick={onRestart}>Novo puzzle</button>
+        <div className="bg-emerald-100 border border-emerald-300 rounded-input px-5 py-3 mb-4 flex items-center justify-between text-emerald-800 text-sm font-medium">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle size={18} />Criptograma resolvido! Todas as letras foram preenchidas.
+          </span>
+          <button className="bg-emerald-500 text-white border-none rounded-input px-3.5 py-1.5 cursor-pointer text-xs font-semibold hover:bg-emerald-600 transition-colors" onClick={onRestart}>Novo puzzle</button>
         </div>
       )}
 
       {/* Body */}
-      <main style={s.body}>
+      <main className="flex gap-0 flex-1">
         <CluePanel clues={clues} activeRow={activeRow} cellSize={cellSize} rowCount={rowCount} />
-        <div style={s.gridWrap}>
+        <div className="flex-1 overflow-x-auto">
           <PuzzleGrid
             grid={grid}
             extractedSymbols={extractedSymbols}
@@ -134,15 +140,15 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
       </main>
 
       {/* Mapping legend */}
-      <footer style={s.legend}>
-        <p style={s.legendTitle}>Mapeamento ativo</p>
-        <div style={s.legendChips}>
+      <footer className="bg-surface-subtle border border-border rounded-input px-4 py-3 mt-5">
+        <p className="text-xs font-bold text-ink-muted mb-2 uppercase tracking-widest">Mapeamento ativo</p>
+        <div className="flex flex-wrap gap-1.5">
           {Object.entries(mapping).map(([symbolId, letter]) =>
             letter ? (
-              <span key={symbolId} style={s.chip}>
-                <span style={s.chipId}>{/^\d+$/.test(symbolId) ? `#${symbolId}` : symbolId.replace(/^cluster_/, '#').replace(/^symbol[-_]/, '#')}</span>
-                <span style={s.chipArrow}>→</span>
-                <span style={s.chipLetter}>{letter}</span>
+              <span key={symbolId} className="inline-flex items-center bg-surface-card border border-border rounded-input px-2 py-0.5 text-xs gap-1">
+                <span className="text-primary font-bold">{/^\d+$/.test(symbolId) ? `#${symbolId}` : symbolId.replace(/^cluster_/, '#').replace(/^symbol[-_]/, '#')}</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-ink font-semibold">{letter}</span>
               </span>
             ) : null,
           )}
@@ -152,14 +158,12 @@ export function StepSolution({ processedData, mapping: initialMapping, onBack, o
   );
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
 import type { GridCell } from '../types/grid';
 
 function buildGrid(data: ProcessedData): GridCell[][] {
   const { grid, uniqueSymbols } = data;
   const rows = grid.rows;
-  const cols = grid.cols - 1; // skip clue column 0
+  const cols = grid.cols - 1;
 
   const matrix: GridCell[][] = Array.from({ length: rows }, (_, r) =>
     Array.from({ length: cols }, (_, c) => ({
@@ -170,11 +174,10 @@ function buildGrid(data: ProcessedData): GridCell[][] {
     } satisfies GridCell)),
   );
 
-  // uniqueSymbols.occurrences contém as posições reais (col já inclui offset da coluna de pistas)
   for (const sym of uniqueSymbols) {
     for (const pos of sym.occurrences) {
       const r = pos.row;
-      const c = pos.col - 1; // remove coluna de pistas (col 0)
+      const c = pos.col - 1;
       if (r >= 0 && r < rows && c >= 0 && c < cols) {
         matrix[r][c] = { ...matrix[r][c], symbolId: sym.symbolId };
       }
@@ -183,32 +186,3 @@ function buildGrid(data: ProcessedData): GridCell[][] {
 
   return matrix;
 }
-
-// ─── styles ───────────────────────────────────────────────────────────────────
-
-const s: Record<string, React.CSSProperties> = {
-  page:            { display: 'flex', flexDirection: 'column', minHeight: '70vh' },
-  header:          { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: '12px 20px', marginBottom: 20 },
-  headerLeft:      { flex: 1 },
-  headerCenter:    { flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
-  headerRight:     { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 },
-  headerLogo:      { fontSize: 16, fontWeight: 700, color: '#1a1a1a' },
-  headerBtn:       { background: 'none', border: '1px solid #e5e5e5', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#444' },
-  dangerBtn:       { background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: '#dc2626' },
-  progressWrap:    { display: 'flex', alignItems: 'center', gap: 8, width: 180 },
-  progressTrack:   { flex: 1, height: 6, background: '#e5e5e5', borderRadius: 3, overflow: 'hidden' },
-  progressFill:    { height: '100%', background: '#667eea', transition: 'width .3s' },
-  progressLabel:   { fontSize: 12, color: '#667eea', fontWeight: 700, minWidth: 32 },
-  timer:           { fontSize: 13, fontWeight: 600, color: '#555', fontVariantNumeric: 'tabular-nums' },
-  completionBanner:{ background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '12px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#065f46', fontSize: 15, fontWeight: 500 },
-  newPuzzleBtn:    { background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  body:            { display: 'flex', gap: 0, flex: 1 },
-  gridWrap:        { flex: 1, overflowX: 'auto' },
-  legend:          { background: '#f8f9fa', border: '1px solid #e5e5e5', borderRadius: 10, padding: '12px 16px', marginTop: 20 },
-  legendTitle:     { fontSize: 12, fontWeight: 700, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
-  legendChips:     { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  chip:            { display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #e5e5e5', borderRadius: 6, padding: '3px 8px', fontSize: 12, gap: 4 },
-  chipId:          { color: '#667eea', fontWeight: 700 },
-  chipArrow:       { color: '#aaa' },
-  chipLetter:      { color: '#1a1a1a', fontWeight: 600 },
-};

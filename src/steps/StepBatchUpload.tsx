@@ -1,5 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { FolderOpen, X } from 'lucide-react';
 import type { BatchImage } from '../types/batch';
+import { loadOpenCV } from '@/lib/opencv/loadOpenCV';
 
 interface Props {
   onImagesReady: (images: { id: string; imageData: ImageData; name: string }[]) => void;
@@ -10,6 +12,10 @@ export function StepBatchUpload({ onImagesReady }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    loadOpenCV();
+  }, []);
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -80,12 +86,15 @@ export function StepBatchUpload({ onImagesReady }: Props) {
   const validImages = images.filter((img) => img.status === 'pending');
 
   return (
-    <div style={s.wrap}>
-      <h1 style={s.title}>Carregar Criptogramas</h1>
-      <p style={s.sub}>Faça upload de uma ou mais fotos de criptogramas para processar em lote</p>
+    <div className="max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-1.5 text-ink">Carregar Criptogramas</h1>
+      <p className="text-sm text-ink-muted mb-7">Faça upload de uma ou mais fotos de criptogramas para processar em lote</p>
 
       <div
-        style={{ ...s.drop, ...(isDragging ? s.dropActive : {}) }}
+        className={`
+          border-2 border-dashed rounded-card p-14 text-center cursor-pointer transition-all duration-200 mb-6
+          ${isDragging ? 'border-primary bg-primary-active' : 'border-border bg-surface-page'}
+        `}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
@@ -104,17 +113,17 @@ export function StepBatchUpload({ onImagesReady }: Props) {
         role="button"
         aria-label="Clique ou arraste imagens aqui para fazer upload"
       >
-        <div style={{ fontSize: 64, marginBottom: 12 }}>📁</div>
-        <p style={{ fontSize: 17, color: '#333', margin: '0 0 6px' }}>
+        <FolderOpen size={64} className="mx-auto mb-3 text-ink-faint" />
+        <p className="text-base text-ink font-medium mb-1.5">
           Arraste ou clique para selecionar múltiplas imagens
         </p>
-        <p style={{ fontSize: 13, color: '#999', margin: 0 }}>JPG, PNG, JPEG — Múltiplos arquivos suportados</p>
+        <p className="text-xs text-ink-faint m-0">JPG, PNG, JPEG — Múltiplos arquivos suportados</p>
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
           multiple
-          style={{ display: 'none' }}
+          className="hidden"
           onChange={(e) => {
             if (e.target.files) addFiles(e.target.files);
           }}
@@ -122,24 +131,33 @@ export function StepBatchUpload({ onImagesReady }: Props) {
       </div>
 
       {images.length > 0 && (
-        <div style={s.list}>
-          <div style={s.listHeader}>
-            <strong style={{ fontSize: 16 }}>{images.length} imagem(ns) selecionada(s)</strong>
-            <button style={s.clearBtn} onClick={() => setImages([])}>Limpar tudo</button>
+        <div className="bg-surface-card border border-border rounded-card p-5 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <strong className="text-base">{images.length} imagem(ns) selecionada(s)</strong>
+            <button className="bg-none border-none text-error cursor-pointer text-sm hover:bg-error/10 px-2 py-1 rounded-input transition-colors" onClick={() => setImages([])}>Limpar tudo</button>
           </div>
 
-          <div style={s.grid}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 mb-5">
             {images.map((img) => (
-              <div key={img.id} style={s.card}>
-                <button style={s.removeBtn} onClick={() => removeImage(img.id)} aria-label="Remover imagem">×</button>
-                <img src={img.preview} alt={img.name} style={s.thumb} />
-                <p style={s.name} title={img.name}>{img.name}</p>
+              <div key={img.id} className="relative rounded-input overflow-hidden border border-border">
+                <button
+                  className="absolute top-1 right-1 w-5.5 h-5.5 rounded-full bg-black/60 text-white border-none cursor-pointer text-sm flex items-center justify-center hover:bg-black/80 transition-colors"
+                  onClick={() => removeImage(img.id)}
+                  aria-label="Remover imagem"
+                >
+                  <X size={12} />
+                </button>
+                <img src={img.preview} alt={img.name} className="w-full h-25 object-cover block" />
+                <p className="text-xs px-2 py-1.5 m-0 whitespace-nowrap overflow-hidden text-ellipsis bg-surface-subtle" title={img.name}>{img.name}</p>
               </div>
             ))}
           </div>
 
           <button
-            style={{ ...s.procBtn, ...(isLoading || validImages.length === 0 ? s.procBtnDisabled : {}) }}
+            className={`
+              w-full py-3.5 text-sm font-semibold text-white rounded-input cursor-pointer transition-all duration-200
+              ${isLoading || validImages.length === 0 ? 'bg-ink-faint cursor-not-allowed' : 'bg-primary hover:bg-primary-hover'}
+            `}
             onClick={handleProcess}
             disabled={isLoading || validImages.length === 0}
           >
@@ -148,9 +166,9 @@ export function StepBatchUpload({ onImagesReady }: Props) {
         </div>
       )}
 
-      <div style={s.tips}>
-        <strong style={{ display: 'block', marginBottom: 8 }}>Dicas para processamento em lote</strong>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#666', lineHeight: 1.8 }}>
+      <div className="bg-surface-subtle border border-border rounded-input p-4.5 px-5">
+        <strong className="block mb-2 text-sm">Dicas para processamento em lote</strong>
+        <ul className="m-0 pl-4.5 text-xs text-ink-muted leading-relaxed">
           <li>Selecione todas as imagens de uma vez</li>
           <li>Imagens serão processadas sequencialmente</li>
           <li>Você poderá escolher qual criptograma resolver após o processamento</li>
@@ -159,32 +177,3 @@ export function StepBatchUpload({ onImagesReady }: Props) {
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  wrap: { maxWidth: 900, margin: '0 auto' },
-  title: { fontSize: 28, fontWeight: 700, marginBottom: 6, color: '#1a1a1a' },
-  sub: { fontSize: 15, color: '#666', marginBottom: 28 },
-  drop: {
-    border: '2px dashed #ccc', borderRadius: 12, padding: '56px 24px', textAlign: 'center',
-    cursor: 'pointer', background: '#fafafa', transition: 'all .2s', marginBottom: 24,
-  },
-  dropActive: { borderColor: '#667eea', background: '#f0f4ff' },
-  list: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: 20, marginBottom: 24 },
-  listHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  clearBtn: { background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 13 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12, marginBottom: 20 },
-  card: { position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e5e5' },
-  thumb: { width: '100%', height: 100, objectFit: 'cover', display: 'block' },
-  name: { fontSize: 11, padding: '6px 8px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: '#f8f9fa' },
-  removeBtn: {
-    position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%',
-    background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', cursor: 'pointer',
-    fontSize: 16, lineHeight: '20px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  procBtn: {
-    width: '100%', padding: 14, fontSize: 15, fontWeight: 600, color: '#fff',
-    background: '#667eea', border: 'none', borderRadius: 8, cursor: 'pointer',
-  },
-  procBtnDisabled: { background: '#ccc', cursor: 'not-allowed' },
-  tips: { background: '#f8f9fa', border: '1px solid #e5e5e5', borderRadius: 10, padding: '18px 20px' },
-};

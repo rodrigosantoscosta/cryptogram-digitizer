@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { SymbolClassifier } from '../../lib/image-processing/SymbolClassifier';
-import type { ExtractedSymbol, SymbolFeatures, UniqueSymbol, CellPosition } from '@/types';
+import type { ExtractedSymbol, SymbolFeatures, UniqueSymbol, CellPosition } from '@/types/symbol';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +37,16 @@ function makeExtractedSymbol(
     positions,
     hash: `sym_${id}`,
   };
+}
+
+function makeCellNumberMap(overrides: Partial<{
+  bySymbol: Record<string, Array<{ row: number; col: number }>>;
+  cells?: import('@/types/ocr').CellNumber[];
+}> = {}): import('@/types/ocr').CellNumberMap {
+  const { bySymbol = {}, cells = [] } = overrides;
+  const total = Object.values(bySymbol).reduce((s, v) => s + v.length, 0);
+  const recognized = total;
+  return { cells, bySymbol, recognized, total };
 }
 
 function makeUniqueSymbol(
@@ -328,13 +338,12 @@ describe('SymbolClassifier.splitCluster', () => {
 
 describe('SymbolClassifier.buildFromNumbers', () => {
   it('deve criar UniqueSymbol para cada número único', () => {
-    const cellNumbers = {
+    const cellNumbers = makeCellNumberMap({
       bySymbol: {
         '1': [{ row: 0, col: 0 }, { row: 1, col: 0 }],
         '2': [{ row: 0, col: 1 }],
       },
-      grid: {},
-    };
+    });
 
     const result = SymbolClassifier.buildFromNumbers(cellNumbers);
 
@@ -344,14 +353,13 @@ describe('SymbolClassifier.buildFromNumbers', () => {
   });
 
   it('deve ordenar por valor numérico', () => {
-    const cellNumbers = {
+    const cellNumbers = makeCellNumberMap({
       bySymbol: {
         '10': [{ row: 0, col: 0 }],
         '2': [{ row: 0, col: 1 }],
         '1': [{ row: 1, col: 0 }],
       },
-      grid: {},
-    };
+    });
 
     const result = SymbolClassifier.buildFromNumbers(cellNumbers);
 
@@ -361,10 +369,9 @@ describe('SymbolClassifier.buildFromNumbers', () => {
   });
 
   it('deve definir mappedLetter como null', () => {
-    const cellNumbers = {
+    const cellNumbers = makeCellNumberMap({
       bySymbol: { '1': [{ row: 0, col: 0 }] },
-      grid: {},
-    };
+    });
 
     const result = SymbolClassifier.buildFromNumbers(cellNumbers);
 
@@ -372,10 +379,9 @@ describe('SymbolClassifier.buildFromNumbers', () => {
   });
 
   it('deve usar extractedSymbols para enriquecer representative quando disponível', () => {
-    const cellNumbers = {
+    const cellNumbers = makeCellNumberMap({
       bySymbol: { '1': [{ row: 0, col: 0 }] },
-      grid: {},
-    };
+    });
     const extractedSymbols = [
       makeExtractedSymbol('s1', makeFeatures(), [{ row: 0, col: 0 }]),
     ];
@@ -386,7 +392,7 @@ describe('SymbolClassifier.buildFromNumbers', () => {
   });
 
   it('deve retornar array vazio para cellNumbers vazio', () => {
-    const cellNumbers = { bySymbol: {}, grid: {} };
+    const cellNumbers = makeCellNumberMap();
 
     const result = SymbolClassifier.buildFromNumbers(cellNumbers);
 
@@ -394,10 +400,9 @@ describe('SymbolClassifier.buildFromNumbers', () => {
   });
 
   it('deve criar hash no formato num_XXX', () => {
-    const cellNumbers = {
+    const cellNumbers = makeCellNumberMap({
       bySymbol: { '5': [{ row: 0, col: 0 }] },
-      grid: {},
-    };
+    });
 
     const result = SymbolClassifier.buildFromNumbers(cellNumbers);
 

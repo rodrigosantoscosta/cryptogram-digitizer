@@ -1,0 +1,29 @@
+{
+  "cells": [
+    { "row": 0, "col": 0, "number": 1, "confidence": 0.97, "rawText": "1", "rawOcr": "1" },
+    { "row": 0, "col": 1, "number": 26, "confidence": 0.95, "rawText": "26", "rawOcr": "26" },
+    { "row": 0, "col": 2, "number": 12, "confidence": 0.93, "rawText": "12", "rawOcr": "12" },
+    { "row": 0, "col": 3, "number": 3, "confidence": 0.96, "rawText": "3", "rawOcr": "3" },
+    { "row": 0, "col": 4, "number": 10, "confidence": 0.94, "rawText": "10", "rawOcr": "10" },
+    { "row": 0, "col": 5, "number": 26, "confidence": 0.95, "rawText": "26", "rawOcr": "26" },
+    { "row": 0, "col": 6, "number": 2, "confidence": 0.98, "rawText": "2", "rawOcr": "2" },
+    { "row": 0, "col": 7, "number": 13, "confidence": 0.96, "rawText": "13", "rawOcr": "13" },
+    { "row": 1, "col": 0, "number": 13, "confidence": 0.95, "rawText": "13", "rawOcr": "13" },
+    { "row": 1, "col": 1, "number": 1, "confidence": 0.97, "rawText": "1", "rawOcr": "1" },
+    { "row": 1, "col": 2, "number": 19, "confidence": 0.93, "rawText": "19", "rawOcr": "19" },
+    { "row": 1, "col": 3, "number": 14, "confidence": 0.94, "rawText": "14", "rawOcr": "14" },
+    { "row": 1, "col": 4, "number": 26, "confidence": 0.95, "rawText": "26", "rawOcr": "26" },
+    { "row": 1, "col": 5, "number": 12, "confidence": 0.93, "rawText": "12", "rawOcr": "12" },
+    { "row": 1, "col": 6, "number": 18, "confidence": 0.92, "rawText": "18", "rawOcr": "18" },
+    { "row": 1, "col": 7, "number": 3, "confidence": 0.96, "rawText": "3", "rawOcr": "3" }
+  ],
+  "bySymbol": {
+    "26": [{ "row": 0, "col": 1 }, { "row": 0, "col": 5 }, { "row": 1, "col": 4 }],
+    "1": [{ "row": 0, "col": 0 }, { "row": 1, "col": 1 }],
+    "13": [{ "row": 0, "col": 7 }, { "row": 1, "col": 0 }],
+    "3": [{ "row": 0, "col": 3 }, { "row": 1, "col": 7 }],
+    "12": [{ "row": 0, "col": 2 }, { "row": 1, "col": 5 }]
+  },
+  "recognized": 16,
+  "total": 96
+}

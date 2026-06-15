@@ -1,15 +1,12 @@
 // src/store/puzzleStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PuzzleState, PuzzleMetadata, ProcessedData, SymbolMapping } from '@/types';
+import type { PuzzleState, PuzzleMetadata } from '@/types/puzzle';
+import type { SymbolMapping } from '@/types/symbol';
 
 interface PuzzleStore {
   currentPuzzle: PuzzleState | null;
   savedPuzzles: PuzzleMetadata[];
-  /** Dados de processamento em trânsito ProcessingPage→MappingPage (contém ImageData, nunca persiste) */
-  pendingProcessedData: ProcessedData | null;
-  setPendingProcessedData: (data: ProcessedData | null) => void;
-
   setCurrentPuzzle: (puzzle: PuzzleState) => void;
   updateMapping: (mapping: SymbolMapping) => void;
   updateSolution: (row: number, col: number, value: string) => void;
@@ -26,9 +23,6 @@ export const usePuzzleStore = create<PuzzleStore>()(
     (set, get) => ({
       currentPuzzle: null,
       savedPuzzles: [],
-      pendingProcessedData: null,
-      setPendingProcessedData: (data) => set({ pendingProcessedData: data }),
-
       setCurrentPuzzle: (puzzle) => set({ currentPuzzle: puzzle }),
 
       updateMapping: (mapping) =>

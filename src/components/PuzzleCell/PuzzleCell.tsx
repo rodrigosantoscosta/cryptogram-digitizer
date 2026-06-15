@@ -1,6 +1,6 @@
 // src/components/PuzzleCell/PuzzleCell.tsx
-import { useRef, useEffect, useCallback } from 'react';
-import type { GridCell } from '@/types';
+import { memo, useRef, useEffect, useCallback } from 'react';
+import type { GridCell } from '@/types/grid';
 import './PuzzleCell.css';
 
 interface PuzzleCellProps {
@@ -14,17 +14,36 @@ interface PuzzleCellProps {
   onKeyDown: (e: React.KeyboardEvent, row: number, col: number) => void;
 }
 
+const offscreenCache = new WeakMap<ImageData, OffscreenCanvas>();
+
 function drawSymbolToCanvas(canvas: HTMLCanvasElement, imageData: ImageData) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const offscreen = new OffscreenCanvas(imageData.width, imageData.height);
-  const octx = offscreen.getContext('2d')!;
-  octx.putImageData(imageData, 0, 0);
+  let offscreen = offscreenCache.get(imageData);
+  if (!offscreen) {
+    offscreen = new OffscreenCanvas(imageData.width, imageData.height);
+    const octx = offscreen.getContext('2d')!;
+    octx.putImageData(imageData, 0, 0);
+    offscreenCache.set(imageData, offscreen);
+  }
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
 }
 
-export function PuzzleCell({
+function areEqual(prev: PuzzleCellProps, next: PuzzleCellProps) {
+  return (
+    prev.cell === next.cell &&
+    prev.isActive === next.isActive &&
+    prev.isHighlighted === next.isHighlighted &&
+    prev.isCorrect === next.isCorrect &&
+    prev.symbolImageData === next.symbolImageData &&
+    prev.onFocus === next.onFocus &&
+    prev.onChange === next.onChange &&
+    prev.onKeyDown === next.onKeyDown
+  );
+}
+
+export const PuzzleCell = memo(function PuzzleCell({
   cell,
   symbolImageData,
   isActive,
@@ -114,4 +133,4 @@ export function PuzzleCell({
       />
     </div>
   );
-}
+})

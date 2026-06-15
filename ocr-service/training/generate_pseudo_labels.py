@@ -30,8 +30,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-# Adicionar diretório pai ao path
-sys.path.insert(0, str(Path(__file__).parent))
+# Adicionar diretório pai ao path para importar módulo compartilhado
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from preprocessing import get_all_strategies
 
 
 # ─── Configuração ──────────────────────────────────────────────────────────────
@@ -50,78 +51,16 @@ _reader = None
 
 
 def get_reader() -> "easyocr.Reader":
-    """Inicializa EasyOCR reader com modelo português (lazy)."""
+    """Inicializa EasyOCR reader com modelo inglês (lazy)."""
     global _reader
     if _reader is None:
         import easyocr
-        print("[PseudoLabel] Loading EasyOCR reader (portuguese_g2)...")
+        print("[PseudoLabel] Loading EasyOCR reader (english_g2)...")
         t0 = time.time()
-        _reader = easyocr.Reader(['pt'], gpu=False, verbose=False, download_enabled=True)
+        _reader = easyocr.Reader(['en'], gpu=False, verbose=False, download_enabled=True)
         elapsed = time.time() - t0
         print(f"[PseudoLabel] EasyOCR loaded in {elapsed:.1f}s")
     return _reader
-
-
-# ─── Multi-Strategy Preprocessing (replica ocr_engine.py) ──────────────────────
-
-def preprocess_binary_otsu(image: np.ndarray) -> np.ndarray:
-    """Strategy 1: Binary + Otsu threshold."""
-    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    edge_pixels = np.concatenate([binary[0, :], binary[-1, :], binary[:, 0], binary[:, -1]])
-    if np.mean(edge_pixels) > 128:
-        binary = cv2.bitwise_not(binary)
-    return _finalize_image(binary)
-
-
-def preprocess_clahe_grayscale(image: np.ndarray) -> np.ndarray:
-    """Strategy 2: CLAHE contrast enhancement + grayscale."""
-    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    return _finalize_image(enhanced)
-
-
-def preprocess_adaptive_denoise(image: np.ndarray) -> np.ndarray:
-    """Strategy 3: Adaptive threshold + aggressive denoising."""
-    gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    denoised = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
-    adaptive = cv2.adaptiveThreshold(
-        denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 11, 2
-    )
-    edge_pixels = np.concatenate([adaptive[0, :], adaptive[-1, :], adaptive[:, 0], adaptive[:, -1]])
-    if np.mean(edge_pixels) > 128:
-        adaptive = cv2.bitwise_not(adaptive)
-    return _finalize_image(adaptive)
-
-
-def _finalize_image(img: np.ndarray) -> np.ndarray:
-    """Common finalization: upscale, padding, convert to RGB."""
-    target_height = 128
-    aspect_ratio = img.shape[1] / img.shape[0]
-    target_width = max(int(target_height * aspect_ratio), 64)
-
-    resized = cv2.resize(img, (target_width, target_height), interpolation=cv2.INTER_LANCZOS4)
-
-    pad_y = int(target_height * 0.3)
-    pad_x = int(target_width * 0.3)
-
-    padded = cv2.copyMakeBorder(
-        resized, pad_y, pad_y, pad_x, pad_x,
-        cv2.BORDER_CONSTANT, value=0
-    )
-
-    return cv2.cvtColor(padded, cv2.COLOR_GRAY2RGB)
-
-
-def get_strategies() -> list[tuple[str, callable]]:
-    """Returns list of (name, preprocess_fn) tuples."""
-    return [
-        ("binary_otsu", preprocess_binary_otsu),
-        ("clahe_grayscale", preprocess_clahe_grayscale),
-        ("adaptive_denoise", preprocess_adaptive_denoise),
-    ]
 
 
 # ─── OCR Recognition ───────────────────────────────────────────────────────────
@@ -152,6 +91,7 @@ def recognize_cell(image: np.ndarray) -> dict:
     """
     Reconhece número em uma célula usando multi-strategy preprocessing.
     Retorna {number, confidence, rawText, strategy}.
+    Early exits when confidence > 0.95 is found.
     """
     reader = get_reader()
     best_result = {
@@ -162,7 +102,7 @@ def recognize_cell(image: np.ndarray) -> dict:
         "strategy": ""
     }
 
-    for strategy_name, preprocess_fn in get_strategies():
+    for strategy_name, preprocess_fn in get_all_strategies():
         try:
             processed = preprocess_fn(image)
             results = reader.readtext(
@@ -187,6 +127,10 @@ def recognize_cell(image: np.ndarray) -> dict:
                         "rawDigits": raw_digits,
                         "strategy": strategy_name,
                     }
+                    
+                    # Early exit on high confidence
+                    if confidence > 0.95:
+                        return best_result
 
         except Exception as e:
             print(f"  [WARN] Strategy {strategy_name} failed: {e}")

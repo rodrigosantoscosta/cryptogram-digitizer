@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Check } from 'lucide-react';
 import type { ProcessedData } from '../types/puzzle';
 
 interface ProcessedPuzzle {
@@ -18,10 +19,10 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
 
   if (puzzles.length === 0) {
     return (
-      <div style={s.wrap}>
-        <h1 style={s.title}>Nenhum criptograma processado</h1>
-        <p style={s.sub}>Todas as imagens falharam no processamento.</p>
-        <button style={s.backBtn} onClick={onBack}>Voltar</button>
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-2xl font-bold mb-1.5 text-ink">Nenhum criptograma processado</h1>
+        <p className="text-sm text-ink-muted mb-7">Todas as imagens falharam no processamento.</p>
+        <button className="px-6 py-3 text-sm font-medium text-ink-muted bg-surface-card border border-border rounded-input cursor-pointer hover:bg-surface-subtle transition-colors" onClick={onBack}>Voltar</button>
       </div>
     );
   }
@@ -33,11 +34,11 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
   };
 
   return (
-    <div style={s.wrap}>
-      <h1 style={s.title}>Processamento Concluído</h1>
-      <p style={s.sub}>{puzzles.length} criptograma(s) processado(s). Selecione qual deseja resolver.</p>
+    <div className="max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-1.5 text-ink">Processamento Concluído</h1>
+      <p className="text-sm text-ink-muted mb-7">{puzzles.length} criptograma(s) processado(s). Selecione qual deseja resolver.</p>
 
-      <div style={s.list}>
+      <div className="flex flex-col gap-3 mb-6">
         {puzzles.map((puzzle, idx) => {
           const isSelected = selectedIndex === idx;
           const gridInfo = puzzle.data.grid;
@@ -47,7 +48,10 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
           return (
             <div
               key={puzzle.id}
-              style={{ ...s.card, ...(isSelected ? s.cardSelected : {}) }}
+              className={`
+                bg-surface-card border-2 rounded-card p-4 cursor-pointer transition-all duration-200
+                ${isSelected ? 'border-primary bg-primary-active' : 'border-border hover:border-primary/50'}
+              `}
               onClick={() => setSelectedIndex(idx)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -59,15 +63,17 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
               role="button"
               aria-label={`Selecionar criptograma ${puzzle.name}`}
             >
-              <div style={s.cardHeader}>
-                <span style={s.cardIndex}>{idx + 1}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={s.cardName} title={puzzle.name}>{puzzle.name}</p>
-                  <p style={s.cardMeta}>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="w-8 h-8 rounded-full bg-border flex items-center justify-center text-sm font-semibold text-ink-muted flex-shrink-0">
+                  {idx + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-ink m-0 whitespace-nowrap overflow-hidden text-ellipsis" title={puzzle.name}>{puzzle.name}</p>
+                  <p className="text-xs text-ink-muted m-0 mt-0.5">
                     {gridInfo.rows}×{gridInfo.cols} • {symbolsCount} símbolos • {cluesCount} pistas
                   </p>
                 </div>
-                {isSelected && <span style={s.checkmark}>✓</span>}
+                {isSelected && <Check size={20} className="text-primary font-bold" />}
               </div>
 
               {puzzle.data.preprocessedImage && (
@@ -80,7 +86,7 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
                     const ctx = canvas.getContext('2d')!;
                     ctx.putImageData(img, 0, 0);
                   }}
-                  style={s.preview}
+                  className="w-full h-auto max-h-50 object-contain rounded-input border border-border block"
                 />
               )}
             </div>
@@ -88,10 +94,15 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
         })}
       </div>
 
-      <div style={s.actions}>
-        <button style={s.backBtn} onClick={onBack}>Voltar</button>
+      <div className="flex gap-3 justify-end">
+        <button className="px-6 py-3 text-sm font-medium text-ink-muted bg-surface-card border border-border rounded-input cursor-pointer hover:bg-surface-subtle transition-colors" onClick={onBack}>Voltar</button>
         <button
-          style={{ ...s.selectBtn, ...(selectedIndex === null ? s.selectBtnDisabled : {}) }}
+          className={`
+            px-6 py-3 text-sm font-semibold rounded-input cursor-pointer transition-all duration-200
+            ${selectedIndex === null
+              ? 'bg-ink-faint cursor-not-allowed text-white'
+              : 'bg-primary text-white hover:bg-primary-hover'}
+          `}
           onClick={handleSelect}
           disabled={selectedIndex === null}
         >
@@ -101,29 +112,3 @@ export function StepPuzzleSelect({ puzzles, onSelect, onBack }: Props) {
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  wrap: { maxWidth: 800, margin: '0 auto' },
-  title: { fontSize: 28, fontWeight: 700, marginBottom: 6, color: '#1a1a1a' },
-  sub: { fontSize: 15, color: '#666', marginBottom: 28 },
-  list: { display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 },
-  card: {
-    background: '#fff', border: '2px solid #e5e5e5', borderRadius: 12, padding: 16,
-    cursor: 'pointer', transition: 'all .2s',
-  },
-  cardSelected: { borderColor: '#667eea', background: '#f0f4ff' },
-  cardHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 },
-  cardIndex: {
-    width: 32, height: 32, borderRadius: '50%', background: '#e5e5e5',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 14, fontWeight: 600, color: '#666', flexShrink: 0,
-  },
-  cardName: { fontSize: 15, fontWeight: 600, color: '#1a1a1a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  cardMeta: { fontSize: 13, color: '#666', margin: '2px 0 0' },
-  checkmark: { fontSize: 20, color: '#667eea', fontWeight: 700 },
-  preview: { width: '100%', height: 'auto', maxHeight: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid #e5e5e5', display: 'block' },
-  actions: { display: 'flex', gap: 12, justifyContent: 'flex-end' },
-  backBtn: { padding: '12px 24px', fontSize: 14, fontWeight: 500, color: '#666', background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8, cursor: 'pointer' },
-  selectBtn: { padding: '12px 24px', fontSize: 14, fontWeight: 600, color: '#fff', background: '#667eea', border: 'none', borderRadius: 8, cursor: 'pointer' },
-  selectBtnDisabled: { background: '#ccc', cursor: 'not-allowed' },
-};

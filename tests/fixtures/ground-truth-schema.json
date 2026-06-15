@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tests/fixtures/ground-truth-schema.json",
+  "title": "GroundTruthPuzzle",
+  "description": "Schema for cryptogram puzzle ground truth data used in OCR comparison testing",
+  "type": "object",
+  "required": ["puzzleId", "sourceImage", "type", "dimensions", "valueRange", "grid", "frequency", "metadata"],
+  "properties": {
+    "puzzleId": {
+      "type": "string",
+      "description": "Unique identifier for the puzzle",
+      "minLength": 1
+    },
+    "sourceImage": {
+      "type": "string",
+      "description": "Relative path to the source puzzle image from project root",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": ["numeric", "pictogram"],
+      "description": "Type of cryptogram puzzle"
+    },
+    "dimensions": {
+      "type": "object",
+      "required": ["rows", "cols"],
+      "properties": {
+        "rows": { "type": "integer", "minimum": 1 },
+        "cols": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "valueRange": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "integer", "minimum": 1 },
+        "max": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "grid": {
+      "type": "array",
+      "description": "2D array of cell values (row-major). null indicates empty cell.",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      }
+    },
+    "frequency": {
+      "type": "object",
+      "description": "Frequency count of each value in the grid",
+      "patternProperties": {
+        "^[0-9]+$": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["validatedBy", "validatedAt"],
+      "properties": {
+        "validatedBy": { "type": "string" },
+        "validatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

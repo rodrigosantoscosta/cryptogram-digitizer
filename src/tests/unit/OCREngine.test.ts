@@ -163,7 +163,7 @@ describe('OCREngine.recognizeClue', () => {
       terminate: vi.fn().mockResolvedValue(undefined),
     };
     const { createWorker } = await import('tesseract.js');
-    createWorker.mockResolvedValue(mockWorker);
+    vi.mocked(createWorker).mockResolvedValue(mockWorker);
 
     engine = new OCREngine();
     await engine.initialize();

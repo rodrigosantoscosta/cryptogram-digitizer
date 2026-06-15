@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { UniqueSymbol, SymbolMapping } from '@/types';
+import type { UniqueSymbol, SymbolMapping } from '@/types/symbol';
 import { SymbolMapper, MappingValidator } from '@/lib/image-processing/SymbolMapper';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

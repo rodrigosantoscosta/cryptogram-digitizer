@@ -1,7 +1,8 @@
 // src/components/PuzzleGrid/PuzzleGrid.tsx
-import { useRef, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { PuzzleCell } from '@/components/PuzzleCell';
-import type { GridCell, ExtractedSymbol } from '@/types';
+import type { GridCell } from '@/types/grid';
+import type { ExtractedSymbol } from '@/types/symbol';
 import './PuzzleGrid.css';
 
 interface PuzzleGridProps {
@@ -35,13 +36,12 @@ export function PuzzleGrid({
   onCellKeyDown,
   cellSize = 44,
 }: PuzzleGridProps) {
-  const symbolMapRef = useRef<Map<string, ImageData>>(new Map());
-  symbolMapRef.current = buildSymbolMap(extractedSymbols);
+  const symbolMap = useMemo(() => buildSymbolMap(extractedSymbols), [extractedSymbols]);
 
   const getSymbolImage = useCallback((symbolId?: string) => {
     if (!symbolId) return null;
-    return symbolMapRef.current.get(symbolId) ?? null;
-  }, []);
+    return symbolMap.get(symbolId) ?? null;
+  }, [symbolMap]);
 
   return (
     <div

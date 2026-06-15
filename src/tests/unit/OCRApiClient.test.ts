@@ -4,9 +4,13 @@
  * Todas as chamadas fetch são mockadas via vi.spyOn(globalThis, 'fetch').
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OCRApiClient } from '@/lib/ocr/OCRApiClient';
 import type { CellImageInput, OCRResult } from '@/lib/ocr/OCRApiClient';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function makeClient(overrides?: { baseUrl?: string; batchSize?: number }): OCRApiClient {
   return new OCRApiClient(overrides?.baseUrl, overrides?.batchSize);

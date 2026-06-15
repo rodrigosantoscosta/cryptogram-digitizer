@@ -96,3 +96,97 @@ docker compose down
 ```
 Frontend (React:5173) → Backend (Fastify:4000) → OCR Service (FastAPI:5000)
 ```
+
+---
+
+## Ground Truth Testing
+
+Framework para comparar a saída do pipeline OCR com dados de referência validados manualmente, medindo acurácia, precisão, recall e distância de edição.
+
+### Criando ground truth
+
+Crie um arquivo JSON em `tests/fixtures/ground-truth/{puzzleId}.json`:
+
+```json
+{
+  "puzzleId": "sample",
+  "sourceImage": "samples/sample_1.jpg",
+  "type": "numeric",
+  "dimensions": { "rows": 12, "cols": 8 },
+  "valueRange": { "min": 1, "max": 27 },
+  "grid": [
+    [1, 26, 12, 3, 10, 26, 2, 13],
+    [13, 1, 19, 14, 26, 12, 18, 3]
+  ],
+  "frequency": { "26": 18, "2": 10 },
+  "metadata": {
+    "validatedBy": "manual",
+    "validatedAt": "2026-06-07T00:00:00Z",
+    "notes": "Descrição opcional"
+  }
+}
+```
+
+Valide o schema: `JSON Schema` disponível em `tests/fixtures/ground-truth-schema.json`.
+
+### Rodando comparações
+
+```bash
+# Todos os puzzles com ground truth
+npm run test:ground-truth
+
+# Com threshold de 85% (CI)
+npm run test:ground-truth:ci
+```
+
+Ou diretamente:
+
+```bash
+node tests/scripts/run-ground-truth.mjs --all --threshold 85
+```
+
+### Interpretando o relatório HTML
+
+Após executar, o relatório HTML é gerado em `tests/results/batch/{runId}.html` com:
+
+- **Métricas gerais**: acurácia, precisão, recall, F1, cobertura
+- **Grade lado a lado**: esperado vs. obtido, com cores:
+  - Verde = correto
+  - Vermelho = incorreto
+  - Amarelo = ausente (esperado mas não reconhecido)
+  - Cinza = abortado (pipeline interrompido)
+- **Tabela de discrepâncias**: lista detalhada com row/col, valor esperado/obtido, confiança
+- **Métricas por dígito**: breakdown de precision/recall/F1 para cada símbolo (1–27)
+
+### Histórico de acurácia
+
+Resultados são persistidos em `tests/results/{puzzleId}/{timestamp}.json` para rastrear tendências ao longo do tempo:
+
+```typescript
+import { getAccuracyTrend } from '../../src/lib/testing/result-store';
+const trend = await getAccuracyTrend('sample');
+// [{ timestamp: '...', accuracy: 0.95 }, ...]
+```
+
+---
+
+## Changelog
+
+### 1.0.0 (2026-06)
+
+- **Batch processing** — suporte para processar múltiplas imagens de criptograma em lote
+- **Hybrid training pipeline** — pipeline de treinamento híbrido com extração de células, pseudo-labeling e dataset builder
+- **OCR accuracy improvements** — EasyOCR em Docker (85%+ acurácia), fallback Tesseract.js, custom model training infraestrutura
+- **Cell Number Reader** — PSM.SINGLE_WORD, retry cascade, dynamic upscale, polarity detection, equalizeHist + CLAHE, digit sanitizer
+- **Ground Truth Testing** — framework de comparação com relatório HTML, métricas por dígito, histórico de acurácia
+- **263 unit tests** — cobertura de testes com Vitest, jsdom polyfills
+- **Grid detection** — FFT com projeção como método primário de detecção de grade
+- **SPA restructure** — arquitetura React + TypeScript com roteamento e estado global
+- **Numeric OCR** — reconhecimento de números com overlay de diagnóstico
+- **Clue OCR** — extração de texto da coluna de pistas via Tesseract.js PSM.SINGLE_COLUMN
+
+### 0.1.0 (2026-05)
+
+- Prova de conceito inicial com pipeline OCR básico
+- Upload de imagem e detecção de grade via OpenCV.js
+- Interface React funcional com etapa de mapeamento símbolo → letra

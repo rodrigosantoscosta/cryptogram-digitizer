@@ -126,6 +126,9 @@ def process_report(
             # Recomendação: Re-rodar generate_pseudo_labels.py com as correções
             # para regenerar o dataset limpo.
             
+            quarantine_subdir = quarantine_dir / str(number)
+            quarantine_subdir.mkdir(parents=True, exist_ok=True)
+            
             actions.append({
                 'original_cell': cell_rel,
                 'classified_as': number,

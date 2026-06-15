@@ -7,6 +7,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: true,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -20,11 +23,14 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
-      'tests/**', // Excluir testes Playwright (E2E) no root
-      'src/tests/unit/ImageProcessor.test.ts', // Requer OpenCV real (não roda em jsdom)
+      'tests/**',
+      'src/tests/unit/ImageProcessor.test.ts',
     ],
     alias: {
       '@': path.resolve(__dirname, './src'),
+    },
+    typecheck: {
+      tsconfig: 'tsconfig.test.json',
     },
   },
 });

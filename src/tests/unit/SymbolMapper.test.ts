@@ -10,7 +10,8 @@ import {
   MappingValidator,
   PORTUGUESE_LETTER_FREQUENCY,
 } from '../../lib/image-processing/SymbolMapper';
-import type { UniqueSymbol, SymbolMapping, SymbolSuggestion, GridCell } from '@/types';
+import type { UniqueSymbol, SymbolMapping, SymbolSuggestion } from '@/types/symbol';
+import type { GridCell } from '@/types/grid';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

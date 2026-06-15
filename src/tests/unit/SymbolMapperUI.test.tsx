@@ -7,7 +7,32 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SymbolMapperUI } from '@/components/Mapping/SymbolMapperUI';
-import type { UniqueSymbol, SymbolMapping, SymbolSuggestion } from '@/types';
+import type { UniqueSymbol, SymbolMapping, SymbolSuggestion, ExtractedSymbol, CellPosition } from '@/types/symbol';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeExtractedSymbol(id: string): ExtractedSymbol {
+  return {
+    id,
+    imageData: { width: 1, height: 1 } as ImageData,
+    features: { area: 0, perimeter: 0, aspectRatio: 0, moments: [], histogram: [], centerOfMass: { x: 0, y: 0 } },
+    positions: [],
+    hash: id,
+  };
+}
+
+function makeSymbol(
+  symbolId: string,
+  occurrences: CellPosition[] = [],
+  mappedLetter: string | null = null,
+): UniqueSymbol {
+  return {
+    symbolId,
+    representative: makeExtractedSymbol(symbolId),
+    occurrences,
+    mappedLetter,
+  };
+}
 
 // ─── isNumericMode (local re-implementation) ─────────────────────────────────
 
@@ -18,16 +43,16 @@ function isNumericMode(symbols: UniqueSymbol[]): boolean {
 describe('isNumericMode', () => {
   it('deve retornar true quando todos os symbolIds são numéricos', () => {
     const symbols: UniqueSymbol[] = [
-      { symbolId: '1', occurrences: [], representative: null, mappedLetter: null },
-      { symbolId: '2', occurrences: [], representative: null, mappedLetter: null },
+      makeSymbol('1'),
+      makeSymbol('1'),
     ];
     expect(isNumericMode(symbols)).toBe(true);
   });
 
   it('deve retornar false quando há symbolId não numérico', () => {
     const symbols: UniqueSymbol[] = [
-      { symbolId: '1', occurrences: [], representative: null, mappedLetter: null },
-      { symbolId: 'cluster_0', occurrences: [], representative: null, mappedLetter: null },
+      makeSymbol('1'),
+      makeSymbol('cluster_0'),
     ];
     expect(isNumericMode(symbols)).toBe(false);
   });
@@ -38,7 +63,7 @@ describe('isNumericMode', () => {
 
   it('deve retornar false para symbolIds mistos com letras e números', () => {
     const symbols: UniqueSymbol[] = [
-      { symbolId: 'sym1', occurrences: [], representative: null, mappedLetter: null },
+      makeSymbol('sym1'),
     ];
     expect(isNumericMode(symbols)).toBe(false);
   });
@@ -48,9 +73,9 @@ describe('isNumericMode', () => {
 
 describe('SymbolMapperUI filtering', () => {
   const symbols: UniqueSymbol[] = [
-    { symbolId: '1', occurrences: [{ row: 0, col: 1 }], representative: null, mappedLetter: null },
-    { symbolId: '2', occurrences: [{ row: 0, col: 2 }], representative: null, mappedLetter: null },
-    { symbolId: '3', occurrences: [{ row: 1, col: 1 }], representative: null, mappedLetter: null },
+    makeSymbol('1', [{ row: 0, col: 1 }]),
+    makeSymbol('2', [{ row: 0, col: 2 }]),
+    makeSymbol('3', [{ row: 1, col: 1 }]),
   ];
 
   const mapping: SymbolMapping = { '1': 'A', '2': 'B', '3': 'C' };
@@ -108,9 +133,9 @@ describe('SymbolMapperUI filtering', () => {
 
 describe('SymbolMapperUI sorting', () => {
   const symbols: UniqueSymbol[] = [
-    { symbolId: '1', occurrences: [{ row: 0, col: 1 }, { row: 1, col: 1 }], representative: null, mappedLetter: null },
-    { symbolId: '2', occurrences: [{ row: 0, col: 2 }], representative: null, mappedLetter: null },
-    { symbolId: '3', occurrences: [{ row: 0, col: 3 }, { row: 1, col: 3 }, { row: 2, col: 3 }], representative: null, mappedLetter: null },
+    makeSymbol('1', [{ row: 0, col: 1 }, { row: 1, col: 1 }]),
+    makeSymbol('2', [{ row: 0, col: 2 }]),
+    makeSymbol('3', [{ row: 0, col: 3 }, { row: 1, col: 3 }, { row: 2, col: 3 }]),
   ];
 
   const mapping: SymbolMapping = { '1': 'A', '2': 'B', '3': 'C' };
@@ -172,8 +197,8 @@ describe('SymbolMapperUI sorting', () => {
 describe('SymbolMapperUI counter & badge', () => {
   it('deve mostrar contador de mapeamento', () => {
     const symbols: UniqueSymbol[] = [
-      { symbolId: '1', occurrences: [], representative: null, mappedLetter: null },
-      { symbolId: '2', occurrences: [], representative: null, mappedLetter: null },
+      makeSymbol('1'),
+      makeSymbol('1'),
     ];
     const mapping: SymbolMapping = { '1': 'A' };
 
@@ -190,7 +215,7 @@ describe('SymbolMapperUI counter & badge', () => {
 
   it('deve mostrar badge "modo numérico" em modo numérico', () => {
     const symbols: UniqueSymbol[] = [
-      { symbolId: '1', occurrences: [], representative: null, mappedLetter: null },
+      makeSymbol('1'),
     ];
 
     render(
@@ -211,7 +236,7 @@ describe('SymbolMapperUI onMappingChange', () => {
   it('deve chamar onMappingChange ao digitar no input', () => {
     const onMappingChange = vi.fn();
     const symbols: UniqueSymbol[] = [
-      { symbolId: '1', occurrences: [], representative: null, mappedLetter: null },
+      makeSymbol('1'),
     ];
 
     render(
